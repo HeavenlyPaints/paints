@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+#video {
+  width: 300px;
+  height: 300px;
+  object-fit: cover;
+}
+
+@media (min-width: 768px) {
+  #video {
+    border-radius: 50%;
+    overflow: hidden;
+  }
+}
+
+#video {
+  background: #000;
+}
+</style>
+
+<h2>Staff Registration</h2>
+
+<h3> Sign up below or <a href="{{ url_for('main.staff_login') }}">Sign in here....</a></h3>
+<form id="staffForm" method="POST" enctype="multipart/form-data">
+
+  <div class="phase" id="phase1">
+    <h3>Personal Information</h3>
+    <input name="name" placeholder="Enter valid full name" style="text-transform:capitalize;" required>
+    <input name="age" style="text-transform:capitalize;" type="number" placeholder="Age" required>
+    <br><br>
+
+
+    <select name="nationality" id="nationality" required>
+  <option value="">Select Country</option>
+  <option value="Nigeria">Nigeria</option>
+  <option value="Ghana">Ghana</option>
+  <option value="Cameroon">Cameroon</option>
+  <option value="Niger">Niger</option>
+  <option value="Benin">Benin</option>
+  <option value="Chad">Chad</option>
+</select>
+
+
+    <!-- STATE SELECT -->
+    <label for="state"></label>
+    <select id="state" name="state" required>
+      <option value="" disabled selected>Select State</option>
+    </select>
+    <br><br>
+
+    <!-- L.G.A SELECT -->
+    <label for="lga"></label>
+    <select id="lga" name="lga" required>
+      <option value="" disabled selected>Select L.G.A</option>
+    </select>
+
+    <select name="gender" required>
+      <option value="">Gender</option>
+      <option>Male</option>
+      <option>Female</option>
+    </select><br><br>
+
+  
+
+    <button type="button" class="btn" onclick="nextPhase(1)">Next</button>
+</div>
+ 
+  <div class="phase" id="phase2" style="display:none;">
+    <input name="nin" placeholder="NIN" required>
+    <input name="email" type="email" placeholder="Email" required>
+
+    <select name="role" required>
+      <option value="">Select Role</option>
+      <option>Manager</option>
+      <option>Secretary</option>
+      <option>Sales</option>
+      <option>Treasurer</option>
+      <option>Human Resource (HR)</option>
+      <option>Manufacturer</option>
+      <option>Distributor</option>
+      <option>General Service</option>
+      <option>Cleaner</option>
+      <option>Gate Keeper</option>
+      <option>IT Support</option>
+      <option>Operations Officer</option>
+      <option>Customer Service</option>
+      <option>Quality Assurance</option>
+      <option>Research & Development (R&D)</option>
+      <option>Procurement Officer</option>
+    </select><br><br>
+
+    <button type="button" class="btn" onclick="prevPhase(2)">Back</button>
+    <button type="button" class="btn" onclick="nextPhase(2)">Next</button>
+  </div>
+
+ 
+  <div class="phase" id="phase3" style="display:none;">
+    <h4>Bank Details</h4>
+    <input name="bank_name" placeholder="Bank Name" required><br><br>
+    <input name="bank_code" placeholder="Bank Code" required><br><br>
+    <input name="account_number" placeholder="Account Number" required><br><br>
+    <input name="account_name" placeholder="Account Name" required><br><br>
+
+    <button type="button" class="btn" onclick="prevPhase(3)">Back</button>
+    <button type="button" class="btn" onclick="nextPhase(3)">Next</button>
+  </div>
+
+ 
+  <div class="phase" id="phase4" style="display:none;">
+    <h4>Face Capture</h4>
+
+    <video id="video" autoplay playsinline style="display:none;"></video>
+    <canvas id="canvas" hidden></canvas>
+
+    <img id="facePreview"
+         style="display:none;border-radius:50%;width:150px;height:150px;margin:10px auto;cursor:pointer;"
+         title="Click to view full image">
+
+    <br>
+
+    <button type="button" class="btn" id="startCamera">Open Camera</button>
+    <button type="button" class="btn" id="captureBtn" disabled>Capture Face</button>
+
+       <input type="hidden" name="image" id="image">
+
+    <p id="faceError" style="color:red;display:none;">❌ No face detected. Please take a clear picture.</p>
+
+    <button type="button" class="btn" onclick="prevPhase(4)">Back</button>
+    <button type="button" class="btn" onclick="validateFaceAndProceed()">Next</button>
+  </div>
+
+  
+  <div class="phase" id="phase5" style="display:none;">
+    <h4>Upload Documents</h4>
+    <input type="file" name="documents" multiple>
+
+    <button type="button" class="btn" onclick="prevPhase(5)">Back</button>
+    <button type="button" class="btn" onclick="nextPhase(5)">Next</button>
+  </div>
+
+  
+  <div class="phase" id="phase6" style="display:none;">
+    <h4>Create Login Details</h4>
+    <input name="username" placeholder="Username" required><br><br>
+    <input name="password" type="password" placeholder="Password" required><br><br>
+
+    <label>
+      <input type="checkbox" required>
+      I agree to the Staff Terms & Conditions
+    </label><br><br>
+
+    <button type="button" class="btn" onclick="prevPhase(6)">Back</button>
+    <button type="submit" class="btn">Register</button>
+  </div>
+
+</form>
+
+<script>
+let currentPhase = 1;
+const totalPhases = 6;
+
+function showPhase(n) {
+  for (let i = 1; i <= totalPhases; i++) {
+    document.getElementById('phase' + i).style.display = (i === n) ? 'block' : 'none';
+  }
+  currentPhase = n;
+}
+
+function nextPhase(n) {
+  if (n < totalPhases) showPhase(n + 1);
+}
+
+function prevPhase(n) {
+  if (n > 1) showPhase(n - 1);
+}
+
+
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const imageInput = document.getElementById('image');
+const facePreview = document.getElementById('facePreview');
+const faceError = document.getElementById('faceError');
+const startCameraBtn = document.getElementById('startCamera');
+const captureBtn = document.getElementById('captureBtn');
+
+let stream;
+
+
+startCameraBtn.addEventListener('click', async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+    video.style.display = 'block';
+    captureBtn.disabled = false;
+  } catch (err) {
+    alert("Cannot access camera: " + err);
+  }
+});
+
+captureBtn.addEventListener('click', () => {
+  const size = 300;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0, 0, size, size);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(size/2, size/2, size/2, 0, Math.PI*2);
+  ctx.closePath();
+  ctx.clip();
+
+  ctx.drawImage(video, 0, 0, size, size);
+  ctx.restore();
+
+  imageInput.value = canvas.toDataURL('image/png');
+  facePreview.src = imageInput.value;
+  facePreview.style.display = 'block';
+
+  stream.getTracks().forEach(track => track.stop());
+  video.style.display = 'none';
+  captureBtn.disabled = true;
+
+  const data = ctx.getImageData(0,0,size,size).data;
+  let hasFace = false;
+  for(let i=0;i<data.length;i+=4){
+    if(data[i+3] > 10){
+      hasFace = true;
+      break;
+    }
+  }
+  if(!hasFace){
+    faceError.style.display = 'block';
+    imageInput.value = '';
+    facePreview.style.display = 'none';
+  } else {
+    faceError.style.display = 'none';
+  }
+});
+
+function validateFaceAndProceed(){
+  if(!imageInput.value){
+    faceError.style.display = 'block';
+    return;
+  }
+  faceError.style.display = 'none';
+  nextPhase(5); 
+}
+</script>
+
+<script>
+
+const data = {
+  Nigeria: {
+    "Abia": ["Aba North","Aba South","Arochukwu","Bende","Ikwuano","Isiala Ngwa North","Isiala Ngwa South","Isuikwuato","Obi Ngwa","Ohafia","Osisioma","Ugwunagbo","Ukwa East","Ukwa West","Umuahia North","Umuahia South","Umu Nneochi"],
+  "Adamawa": ["Demsa","Fufore","Ganaye","Ganye","Girei","Gombi","Guyuk","Hong","Jada","Lamurde","Madagali","Maiha","Mayo Belwa","Michika","Mubi North","Mubi South","Numan","Shelleng","Song","Toungo","Yola North","Yola South"],
+  "Akwa Ibom": ["Abak","Eastern Obolo","Eket","Esit Eket","Essien Udim","Etim Ekpo","Etinan","Ibeno","Ibesikpo Asutan","Ibiono Ibom","Ika","Ikono","Ikot Abasi","Ikot Ekpene","Ini","Itu","Mbo","Mkpat Enin","Nsit Atai","Nsit Ibom","Nsit Ubium","Obot Akara","Okobo","Onna","Oron","Oruk Anam","Udung Uko","Ukanafun","Uruan","Urue-Offong/Oruko","Uyo"],
+  "Anambra": ["Aguata","Anambra East","Anambra West","Anaocha","Awka North","Awka South","Ayamelum","Dunukofia","Ekwusigo","Idemili North","Idemili South","Ihiala","Njikoka","Nnewi North","Nnewi South","Ogbaru","Onitsha North","Onitsha South","Orumba North","Orumba South","Oyi"],
+  "Bauchi": ["Alkaleri","Bauchi","Bogoro","Damban","Darazo","Dass","Ganjuwa","Giade","Itas/Gadau","Jamaare","Katagum","Kirfi","Misau","Ningi","Shira","Tafawa Balewa","Toro","Warji","Zaki"],
+  "Bayelsa": ["Brass","Ekeremor","Kolokuma/Opokuma","Nembe","Ogbia","Sagbama","Southern Ijaw","Yenagoa"],
+  "Benue": ["Ado","Agatu","Apa","Buruku","Gboko","Guma","Gwer East","Gwer West","Katsina-Ala","Konshisha","Kwande","Logo","Makurdi","Ogbadibo","Ohimini","Oju","Okpokwu","Otukpo","Tarka","Ukum","Ushongo","Vandeikya"],
+  "Borno": ["Abadam","Bama","Bayo","Biu","Chibok","Damboa","Dikwa","Gubio","Guzamala","Gwoza","Hawul","Jere","Kaga","Kala/Balge","Konduga","Kukawa","Kwaya Kusar","Mafa","Magumeri","Maiduguri","Marte","Mobbar","Monguno","Ngala","Nganzai","Shani"],
+  "Cross River": ["Akpabuyo","Akamkpa","Bakassi","Bekwara","Biase","Boki","Calabar Municipal","Calabar South","Etung","Ikom","Obanliku","Obubra","Obudu","Odukpani","Ogoja","Yakuur","Yala"],
+  "Delta": ["Aniocha North","Aniocha South","Bomadi","Burutu","Ethiope East","Ethiope West","Ika North East","Ika South","Isoko North","Isoko South","Ndokwa East","Ndokwa West","Okpe","Oshimili North","Oshimili South","Patani","Sapele","Udu","Ughelli North","Ughelli South","Ukwuani","Uvwie","Warri North","Warri South","Warri South West"],
+  "Ebonyi": ["Abakaliki","Afikpo North","Afikpo South","Ebonyi","Ezza North","Ezza South","Ikwo","Ishielu","Ivo","Ohaozara","Ohaukwu","Onicha"],
+  "Edo": ["Akoko-Edo","Egor","Esan Central","Esan North-East","Esan South-East","Esan West","Etsako Central","Etsako East","Etsako West","Igueben","Ikpoba-Okha","Oredo","Orhionmwon","Ovia North-East","Ovia South-West","Owan East","Owan West","Uhunmwonde"],
+  "Ekiti": ["Ado-Ekiti","Ekiti East","Ekiti South-West","Ekiti West","Emure","Gbonyin","Ido-Osi","Ijero","Ikere","Ikole","Irepodun/Ifelodun","Ise/Orun","Moba","Oye"],
+  "Enugu": ["Aninri","Awgu","Enugu East","Enugu North","Enugu South","Ezeagu","Igbo Etiti","Igbo Eze North","Igbo Eze South","Isi Uzo","Nkanu East","Nkanu West","Nsukka","Oji River","Udenu","Udi","Uzo-Uwani"],
+  "Gombe": ["Akko","Balanga","Billiri","Dukku","Funakaye","Gombe","Kaltungo","Kwami","Nafada","Shongom","Yamaltu/Deba"],
+  "Imo": ["Aboh Mbaise","Ahiazu Mbaise","Ehime Mbano","Ezinihitte","Ideato North","Ideato South","Ihitte/Uboma","Ikeduru","Isiala Mbano","Isu","Mbaitoli","Ngor Okpala","Njaba","Nkwerre","Nwangele","Obowo","Oguta","Ohaji/Egbema","Onuimo","Orlu","Orsu","Oru East","Owerri Municipal","Owerri North","Owerri West","Ukwa East","Ukwa West","Unuimo","Umuaka"],
+  "Jigawa": ["Auyo","Babura","Biriniwa","Birnin Kudu","Buji","Dutse","Gagarawa","Garki","Gumel","Guri","Gwaram","Gwiwa","Hadejia","Jahun","Kafin Hausa","Kaugama","Kazaure","Kiri Kasama","Kiyawa","Maigatari","Malam Madori","Miga","Ringim","Roni","Sule Tankarkar","Taura","Yankwashi"],
+  "Kaduna": ["Birnin Gwari","Chikun","Giwa","Igabi","Ikara","Jaba","Jema'a","Kachia","Kaduna North","Kaduna South","Kagarko","Kajuru","Kaura","Kauru","Kubau","Kudan","Lere","Makarfi","Sabon Gari","Sanga","Soba","Zangon Kataf","Zaria"],
+  "Kano": ["Ajingi","Albasu","Bagwai","Bebeji","Bichi","Bunkure","Dala","Dambatta","Dawakin Kudu","Dawakin Tofa","Doguwa","Fagge","Gabasawa","Garko","Garun Mallam","Gaya","Gezawa","Gwale","Gwarzo","Kabo","Kano Municipal","Kumbotso","Kunchi","Kura","Madobi","Makoda","Minjibir","Nasarawa","Rano","Rimin Gado","Rogo","Shanono","Sumaila","Takai","Tarauni","Tofa","Tsanyawa","Tudun Wada","Ungogo","Warawa","Wudil"],
+  "Katsina": ["Bakori","Batagarawa","Batsari","Baure","Bindawa","Charanchi","Dandume","Danja","Dutsi","Dutsin Ma","Faskari","Funtua","Ingawa","Jibia","Kafur","Kaita","Kankara","Kankia","Kusada","Mai'Adua","Malumfashi","Mani","Mashi","Matazu","Musawa","Rimi","Sabuwa","Safana","Sandamu","Zango"],
+  "Kebbi": ["Aliero","Arewa Dandi","Argungu","Augie","Bagudo","Birnin Kebbi","Bunza","Dandi","Fakai","Gwandu","Jega","Kalgo","Koko/Besse","Maiyama","Ngaski","Sakaba","Shanga","Suru","Wasagu/Danko","Yauri"],
+  "Kogi": ["Adavi","Ajaokuta","Ankpa","Bassa","Dekina","Ibaji","Idah","Igalamela-Odolu","Ijumu","Ikare","Kabba/Bunu","Kogi","Lokoja","Mopa-Muro","Ofu","Ogori/Magongo","Okehi","Okene","Olamaboro","Omala","Yagba East","Yagba West","Mopa-Muro"],
+  "Kwara": ["Asa","Baruten","Edu","Ekiti","Ifelodun","Ilorin East","Ilorin West","Irepodun","Isin","Kaiama","Moro","Offa","Oke Ero","Oyun","Patigi"],
+  "Lagos": ["Agege","Ajeromi-Ifelodun","Alimosho","Amuwo-Odofin","Apapa","Badagry","Epe","Eti-Osa","Ibeju-Lekki","Ifako-Ijaiye","Ikeja","Ikorodu","Kosofe","Lagos Island","Lagos Mainland","Mushin","Ojo","Oshodi-Isolo","Shomolu","Surulere"],
+  "Nasarawa": ["Akwanga","Awe","Doma","Karu","Keana","Keffi","Kokona","Lafia","Nasarawa","Nasarawa Egon","Obi","Toto","Wamba"],
+  "Niger": ["Agaie","Agwara","Bida","Borgu","Bosso","Chanchaga","Edati","Gbako","Katcha","Kontagora","Lapai","Lavun","Magama","Mariga","Mokwa","Muya","Paikoro","Rafi","Rijau","Shiroro","Suleja","Tafa","Wushishi"],
+  "Ogun": ["Abeokuta North","Abeokuta South","Ado-Odo/Ota","Ewekoro","Ijebu East","Ijebu North","Ijebu North East","Ijebu Ode","Ikenne","Imeko Afon","Ipokia","Obafemi-Owode","Odeda","Odogbolu","Remo North","Shagamu","Yewa North","Yewa South"],
+  "Ondo": ["Akoko North-East","Akoko North-West","Akoko South-East","Akoko South-West","Ese Odo","Idanre","Ifedore","Ilaje","Ile Oluji/Okeigbo","Irele","Odigbo","Okitipupa","Ondo East","Ondo West","Ose","Owo"],
+  "Osun": ["Aiyedaade","Aiyedire","Atakunmosa East","Atakunmosa West","Boluwaduro","Boripe","Ede North","Ede South","Egbedore","Ejigbo","Ife Central","Ife East","Ife North","Ife South","Ifedayo","Ifelodun","Ila","Ilesa East","Ilesa West","Irepodun","Irewole","Isokan","Iwo","Obokun","Odo-Otin","Ola-Oluwa","Olorunda","Oriade","Orolu","Osogbo"],
+  "Oyo": ["Afijio","Akinyele","Atiba","Atisbo","Egbeda","Ibadan North","Ibadan North-East","Ibadan North-West","Ibadan South-East","Ibadan South-West","Ibarapa Central","Ibarapa East","Ibarapa North","Irepo","Iseyin","Itesiwaju","Iwajowa","Kajola","Lagelu","Ogo Oluwa","Ogbomosho North","Ogbomosho South","Olorunsogo","Oluyole","Ona Ara","Orelope","Orire","Oyo East","Oyo West","Saki East","Saki West","Surulere","Irepo"],
+  "Plateau": ["Bokkos","Barkin Ladi","Bassa","Batu","Bokkos","Jos East","Jos North","Jos South","Kanam","Kanke","Langtang North","Langtang South","Mangu","Mikang","Pankshin","Qua'an Pan","Riyom","Shendam","Wase"],
+  "Rivers": ["Abua/Odual","Ahoada East","Ahoada West","Akuku-Toru","Andoni","Asari-Toru","Bonny","Degema","Eleme","Emohua","Etche","Gokana","Ikwerre","Khana","Obio/Akpor","Ogba/Egbema/Ndoni","Ogu/Bolo","Okrika","Omuma","Opobo/Nkoro","Oyigbo","Port Harcourt","Tai"],
+  "Sokoto": ["Binji","Bodinga","Dange Shuni","Gada","Goronyo","Gudu","Gwadabawa","Illela","Isa","Kebbe","Kware","Rabah","Sabon Birni","Shagari","Silame","Sokoto North","Sokoto South","Tambuwal","Tangaza","Tureta","Wamako","Wurno","Yabo"],
+  "Taraba": ["Ardo Kola","Bali","Donga","Gashaka","Gassol","Ibi","Jalingo","Karim Lamido","Kurmi","Lau","Sardauna","Takum","Ussa","Wukari","Yorro","Zing"],
+  "Yobe": ["Bade","Bursari","Damaturu","Fika","Fune","Gashua","Gujba","Gulani","Jakusko","Karasuwa","Machina","Nangere","Nguru","Potiskum","Tarmuwa","Yunusari","Yusufari"],
+  "Zamfara": ["Anka","Bakura","Birnin Magaji","Bukkuyum","Chafe","Gummi","Gusau","Kaura Namoda","Maradun","Shinkafi","Talata Mafara","Tsafe","Zurmi"],
+  },
+
+  Ghana: {
+    "Greater Accra": ["Accra Metropolitan","Tema Metropolitan"],
+    "Ashanti": ["Kumasi Metropolitan"]
+  },
+
+  Cameroon: {
+    "Littoral": ["Wouri"],
+    "Centre": ["Mfoundi"]
+  },
+
+  Niger: {
+    "Niamey": ["Niamey I","Niamey II","Niamey III"]
+  },
+
+  Benin: {
+    "Littoral": ["Cotonou"],
+    "Atlantique": ["Abomey-Calavi"]
+  },
+
+  Chad: {
+    "N'Djamena": ["N'Djamena"]
+  }
+};
+
+
+const countrySelect = document.getElementById("country");
+const stateSelect = document.getElementById("state");
+const lgaSelect = document.getElementById("lga");
+
+countrySelect.addEventListener("change", () => {
+  stateSelect.innerHTML = '<option value="">Select State</option>';
+  lgaSelect.innerHTML = '<option value="">Select L.G.A</option>';
+
+  const states = data[countrySelect.value];
+  if (states) {
+    Object.keys(states).forEach(state => {
+      const option = document.createElement("option");
+      option.value = state;
+      option.textContent = state;
+      stateSelect.appendChild(option);
+    });
+  }
+});
+
+stateSelect.addEventListener("change", () => {
+  lgaSelect.innerHTML = '<option value="">Select L.G.A</option>';
+
+  const lgas = data[countrySelect.value]?.[stateSelect.value];
+  if (lgas) {
+    lgas.forEach(lga => {
+      const option = document.createElement("option");
+      option.value = lga;
+      option.textContent = lga;
+      lgaSelect.appendChild(option);
+    });
+  }
+});
+
+</script>
+{% endblock %}

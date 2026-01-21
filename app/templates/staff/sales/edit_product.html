@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="dashboard-wrapper">
+  <div class="dashboard-card center">
+
+    <h2>Edit Product</h2>
+
+    <form method="POST" enctype="multipart/form-data">
+      <label>Name</label>
+      <input type="text" name="name" value="{{ product.name }}" required>
+
+      <label>Description</label>
+      <textarea name="description" required>{{ product.description }}</textarea>
+
+      <label>Price</label>
+      <input type="number" name="price" value="{{ product.price }}" required>
+
+      <label>Change Image (optional)</label>
+      <input type="file" name="image">
+
+      <button class="btn">Update Product</button>
+    </form>
+
+    <a href="{{ url_for('main.sales_dashboard') }}">
+      <button class="btn secondary">⬅ Back</button>
+    </a>
+
+  </div>
+</div>
+
+{% endblock %}

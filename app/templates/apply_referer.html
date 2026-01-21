@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 style="text-align:center;">Become a Verified Referrer</h2>
+
+<form id="signup-form" method="POST" action="/register">
+
+    <label>Full Name: </label>
+    <input type="text" name="full_name" required><br><br>
+
+    <label>WhatsApp Number: </label>
+    <input type="text" name="whatsapp_number" placeholder="2348123456789" required><br><br>
+
+    <label>Select Bank: </label>
+    <select id="bank-select" name="bank_code" required>
+        <option value=""> Choose Bank </option>
+        {% for bank in banks %}
+            <option value="{{ bank.code }}">{{ bank.name }}</option>
+        {% endfor %}
+    </select><br><br>
+
+    <label>Account Number: </label>
+    <input type="text" id="account-number" name="account_number" maxlength="10" required><br><br>
+
+    <label>Account Name: </label>
+    <input type="text" id="account-name" name="account_name" readonly><br><br>
+
+    <button type="submit">Complete Registration</button>
+
+</form>
+
+<script>
+document.getElementById('account-number').addEventListener('input', function () {
+    const bankCode = document.getElementById('bank-select').value;
+    const accNumber = this.value;
+
+    if (bankCode && accNumber.length === 10) {
+        fetch('/verify_account', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                bank_code: bankCode,
+                account_number: accNumber
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.account_name) {
+                document.getElementById('account-name').value = data.account_name;
+            } else {
+                document.getElementById('account-name').value = 'Verification failed';
+            }
+        });
+    }
+});
+</script>
+
+{% endblock %}
