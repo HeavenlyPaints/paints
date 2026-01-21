@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if not referrer.is_approved %}
+
+    <div style="text-align:center; margin-top:50px;">
+        <h2>Your account is awaiting admin approval</h2>
+        <p>Please wait until the admin verifies your account.</p>
+    </div>
+
+{% else %}
+
+
+<h2>Referrer Dashboard</h2>
+
+<p><strong>Name: </strong> {{ referrer.full_name }}</p>
+<p><strong>WhatsApp: </strong> {{ referrer.whatsapp_number }}</p>
+
+<hr>
+
+<p><strong>Referral Token: </strong> {{ referrer.token }}</p>
+
+<p><strong>Total Earnings: </strong> ₦{{ "%.2f" % (referrer.earnings / 100) }}</p>
+
+<p><strong>Total Referrals: </strong> {{ referrer.referrals_count }}</p>
+
+<p><strong>Badge Level: </strong> {{ badge or "None" }}</p>
+<p><strong>Commission Rate: </strong> {{ pct }}%</p>
+{% endif %}
+<hr>
+
+<h3>Referral Link</h3>
+<button class="btn" onclick="generateReferral('{{ referrer.token }}')">Generate Referral Link</button>
+<p id="ref-link" style="margin-top:10px;"></p>
+
+<hr>
+
+<h3>Withdraw Earnings</h3>
+
+<p><strong>Bank: </strong> {{ referrer.bank_name }}</p>
+<p><strong>Account Number: </strong> {{ referrer.account_number }}</p>
+<p><strong>Account Name: </strong> {{ referrer.account_name }}</p>
+
+<form id="withdraw-form" onsubmit="requestWithdraw(event, '{{ referrer.token }}')">
+    <label>Withdrawal Amount (₦)</label>
+    <input type="number" id="withdraw-amount" min="1" required>
+
+    <button class="btn" type="submit">Withdraw</button>
+</form>
+
+<script>
+function generateReferral(token) {
+    fetch('/generate_link/' + token)
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('ref-link').textContent = d.link || 'Could not generate link';
+        });
+}
+
+function requestWithdraw(e, token) {
+    e.preventDefault();
+
+    const amount_naira = parseFloat(document.getElementById('withdraw-amount').value);
+    const amount_kobo = Math.round(amount_naira * 100);
+
+    fetch('/referer/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            token: token,
+            amount: amount_kobo
+        })
+    })
+    .then(r => r.json())
+    .then(d => {
+        alert(d.message || "Withdrawal submitted");
+        location.reload();
+    });
+}
+</script>
+
+{% endblock %}

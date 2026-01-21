@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Withdrawals</h2>
+<table>
+  <tr><th>Referrer</th><th>Amount</th><th>Account</th><th>Status</th><th>Action</th></tr>
+  {% for w in withdrawals %}
+  <tr>
+    <td>{{ w.referer.name }}</td>
+    <td>₦{{ '%.2f' % (w.amount/100) }}</td>
+    <td>{{ w.account_details }}</td>
+    <td>{{ w.status }}</td>
+    <td>
+      {% if w.status != 'paid' %}
+      <form method="POST" action="{{ url_for('main.admin_pay_withdrawal', id=w.id) }}"><button class="btn" type="submit">Mark Paid</button></form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}
