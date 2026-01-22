@@ -8,3 +8,4 @@ python-dotenv>=1.0
 Flask-Mailman>=0.5
 Werkzeug>=2.2
 apscheduler>=3.10.4
+gunicorn>=21.0
