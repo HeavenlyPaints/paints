@@ -252,36 +252,46 @@ def paystack_webhook():
     return jsonify({"status": True}), 200
 
 
-@bp.route("/apply", methods=["GET", "POST"])
+@bp.route("/apply-referer", methods=["GET", "POST"])
 def apply_referer():
-    form = RefererApplyForm()
-    if form.validate_on_submit():
+    if request.method == "POST":
+        full_name = request.form.get("full_name")
+        whatsapp = request.form.get("whatsapp_number")
 
-        whatsapp = form.whatsapp.data or form.phone.data
+        existing = Referer.query.filter_by(whatsapp=whatsapp).first()
+        if existing:
+            flash("You have already applied.", "warning")
+            return redirect(url_for("main.referer_login"))
+
+        bank_code = request.form.get("bank_code")
+        account_number = request.form.get("account_number")
+        account_name = request.form.get("account_name")
 
         r = Referer(
-            name=form.name.data,
-            phone=form.phone.data,
-            email=form.email.data,
+            name=full_name,
             whatsapp=whatsapp,
+            bank_code=bank_code,
+            account_number=account_number,
+            account_name=account_name,
             status="pending",
             earnings=0,
             referrals_count=0
         )
+
         db.session.add(r)
         db.session.commit()
 
         send_email(
             "New Referer Application",
             [current_app.config["MAIL_USERNAME"]],
-            f"<h3>New Referer Application</h3><p>{r.name} ({r.whatsapp}) applied.</p>"
+            f"<h3>New Referer Application</h3>"
+            f"<p>{r.name} ({r.whatsapp}) applied.</p>"
         )
 
         flash("Application submitted successfully.", "info")
         return redirect(url_for("main.index"))
 
-    return render_template("referer_login.html", form=form)
-
+    return render_template("apply_referer.html")
 
 
 @bp.route("/generate_link/<token>")
@@ -333,9 +343,15 @@ def referer_withdraw():
     return jsonify({"status": True, "message": "Withdrawal submitted"})
 
 
+
 @bp.route("/referer/<token>/dashboard")
 def referer_dashboard(token):
+    # fetch referer
     r = Referer.query.filter_by(token=token).first_or_404()
+
+    # ✅ SECURITY CHECK: only the logged-in referer can view their dashboard
+    if session.get("referer_id") != r.id:
+        abort(403)
 
     badge, pct = badge_for_count(r.referrals_count)
 
@@ -346,7 +362,6 @@ def referer_dashboard(token):
         pct=pct,
         monthly_earnings=r.earnings
     )
-
 
 
 @bp.route("/referer-login", methods=["GET", "POST"])
@@ -370,6 +385,7 @@ def referer_login():
 
         if referer.status == "approved":
             session["referer_id"] = referer.id
+            session["referer_token"] = referer.token
             return redirect(url_for("main.referer_dashboard", token=referer.token))
 
     return render_template("referer_login.html")
@@ -394,7 +410,7 @@ def approve_referer(id):
     send_email(
         "Referer Approved",
         [current_app.config.get("MAIL_USERNAME")],
-        f"<p>{r.name} ({r.phone}) has been approved as a referer.</p>"
+        f"<p>{r.name} ({r.whatsapp}) has been approved as a referer.</p>"
     )
 
     flash(f"{r.name} has been approved and notified via WhatsApp.", "success")

@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>{% block title %}Heavenly Paint Limited{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <script src="https://cdn.jsdelivr.net/npm/main.js"></script>
 
 </head>
 <body>
@@ -14,24 +13,28 @@
       <img src="{{ url_for('static', filename='uploads/logo.png') }}" alt="logo" class="logo">
       <nav class="nav" id="nav">
         <a href="{{ url_for('main.index') }}">Home</a>
-        <a href="{{ url_for('main.index') }}about">About</a>
-        <a href="{{ url_for('main.index') }}faqs">FAQs</a>
-        <a href="{{ url_for('main.apply_referer') }}">Referer</a>
+        <a href="{{ url_for('main.about') }}">About</a>
+        <a href="{{ url_for('main.faqs') }}">FAQs</a>
+        <a href="{{ url_for('main.apply_referer') }}">Become a Referer</a>
         <a href="{{ url_for('main.admin_login') }}">Admin</a>
         <a href="{{ url_for('main.staff_signup') }}">Staff Signup</a>
         <a href="{{ url_for('main.staff_login') }}">Staff Login</a>
-        {% if session.get('referer_id') %}
-  <a href="{{ url_for('main.referer_dashboard') }}">Referral Dashboard</a>
+
+{% if session.get('referer_id') %}
+  <a href="{{ url_for('main.referer_dashboard', token=session.get('referer_token')) }}">
+    Referral Dashboard
+  </a>
 {% else %}
   <a href="{{ url_for('main.referer_login') }}">Referer Login</a>
 {% endif %}
+
 
       </nav>
 
 
     </div>
     <div class="header-actions">
-      <button id="cart-btn" onclick="openCart()"><v class="cart">🛒</v> <span id="cart-count">0</span></button>
+      <button id="cart-btn" onclick="openCart()"><span class="cart">🛒</span> <span id="cart-count">0</span></button>
     </div>
 
   
@@ -70,7 +73,6 @@
   {% include 'cart_modal.html' %}
 
   <script>const PAYSTACK_PUBLIC = "{{ paystack_public or '' }}";</script>
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   <div id="toast" class="toast">Product added!</div>
 
 
@@ -95,8 +97,7 @@
 
  <script> document.getElementById('year').innerText = new Date().getFullYear();</script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+
 
 
 </body>
