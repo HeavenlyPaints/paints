@@ -291,7 +291,7 @@ def apply_referer():
         flash("Application submitted successfully.", "info")
         return redirect(url_for("main.index"))
 
-    return render_template("apply_referer.html")uu
+    return render_template("apply_referer.html")
 
 
 @bp.route("/generate_link/<token>")
