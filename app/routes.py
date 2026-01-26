@@ -50,7 +50,7 @@ def load_user(user_id):
 
 @bp.route("/")
 def index():
-    from app.models imoort Product
+    from app.models import Product
 
 
     products = Product.query.order_by(Product.created_at.desc()).all()
