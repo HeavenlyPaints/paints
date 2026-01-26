@@ -6,11 +6,12 @@ from sqlalchemy.exc import IntegrityError
 from flask import send_file, abort, current_app
 import io
 import os
+from app.models import Bank
 import zipfile
 from io import BytesIO
 import csv
 from flask import Response
-from app.models import db, Product, Referer, Order
+from app import db
 import os
 from flask import current_app
 from flask import Blueprint, render_template, current_app, request, redirect, url_for, flash, jsonify, send_from_directory, session
@@ -49,6 +50,9 @@ def load_user(user_id):
 
 @bp.route("/")
 def index():
+    from app.models imoort Product
+
+
     products = Product.query.order_by(Product.created_at.desc()).all()
     total_ordered = db.session.query(func.sum(Product.sold)).scalar() or 0
     total_delivered = db.session.query(func.sum(Product.delivered)).scalar() or 0
@@ -252,6 +256,7 @@ def paystack_webhook():
     return jsonify({"status": True}), 200
 
 
+
 @bp.route("/apply", methods=["GET", "POST"])
 def apply_referer():
     if request.method == "POST":
@@ -263,14 +268,14 @@ def apply_referer():
             flash("You have already applied.", "warning")
             return redirect(url_for("main.referer_login"))
 
-        bank_code = request.form.get("bank_code")
+        bank_name = request.form.get("bank_name")  # <-- changed from bank_code
         account_number = request.form.get("account_number")
         account_name = request.form.get("account_name")
 
         r = Referer(
             name=full_name,
             whatsapp=whatsapp,
-            bank_code=bank_code,
+            bank_code=bank_name,  # store bank name instead of code
             account_number=account_number,
             account_name=account_name,
             status="pending",
@@ -291,7 +296,9 @@ def apply_referer():
         flash("Application submitted successfully.", "info")
         return redirect(url_for("main.index"))
 
+        banks = Bank.query.all()
     return render_template("apply_referer.html")
+
 
 
 @bp.route("/generate_link/<token>")
@@ -1201,3 +1208,9 @@ def download_documents(staff_id):
         download_name=f"{staff.staff_id}_documents.zip",
         as_attachment=True
     )
+
+
+@app.route('/signup')
+def signup():
+    banks = Bank.query.order_by(Bank.name).all()  # fetch all banks
+    return render_template('signup.html', banks=banks)
