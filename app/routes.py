@@ -264,21 +264,17 @@ def apply_referer():
         whatsapp = request.form.get("whatsapp_number")
         account_number = request.form.get("account_number")
         account_name = request.form.get("account_name")
+        bank_name = request.form.get("bank")  # matches <select name="bank">
 
         existing = Referer.query.filter_by(whatsapp=whatsapp).first()
         if existing:
             flash("You have already applied.", "warning")
             return redirect(url_for("main.referer_login"))
 
-        # Get bank properly
-        bank_id = request.form.get("bank")
-        bank = Bank.query.get(bank_id)
-        bank_name = bank.name if bank else ""
-
         r = Referer(
             name=full_name,
             whatsapp=whatsapp,
-            bank_code=bank_name,
+            bank_code=bank_name,  # store the selected bank
             account_number=account_number,
             account_name=account_name,
             status="pending",
@@ -299,8 +295,7 @@ def apply_referer():
         flash("Application submitted successfully.", "info")
         return redirect(url_for("main.index"))
 
-    banks = Bank.query.all()  # make sure variable name matches template
-    return render_template("apply_referer.html", banks=banks)
+    return render_template("apply_referer.html")
 
 
 @bp.route("/generate_link/<token>")
