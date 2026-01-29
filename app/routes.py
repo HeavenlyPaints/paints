@@ -257,7 +257,7 @@ def paystack_webhook():
 
 
 
-@main.route('/apply-referer', methods=['GET', 'POST'])
+@bp.route('/apply-referer', methods=['GET', 'POST'])
 def apply_referer():
     if request.method == "POST":
         full_name = request.form.get("full_name")
