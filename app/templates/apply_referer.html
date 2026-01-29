@@ -12,7 +12,7 @@
     <input type="text" name="whatsapp_number" placeholder="2348123456789" required><br><br>
 
     <label for="bank">Select Your Bank:</label>
-<select name="bank" id="bank" required>
+<select name="bank" id="banks" required>
     <option value="">--Choose Bank--</option>
     {% for bank in banks %}
         <option value="{{ bank.id }}">{{ bank.name }}</option>
@@ -23,7 +23,7 @@
     <input type="text" id="account-number" name="account_number" maxlength="10" required><br><br>
 
     <input type="checkbox" id="same-name" />
-    <label for="same-name">My account name is the same as my full name</label><br><br>
+    <label for="same-name">Account name same as my full name? </label><br><br>
 
     <label>Account Name: </label>
     <input type="text" id="account-name" name="account_name" required><br><br>

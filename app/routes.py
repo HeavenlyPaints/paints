@@ -257,25 +257,28 @@ def paystack_webhook():
 
 
 
-@bp.route("/apply", methods=["GET", "POST"])
+@main.route('/apply-referer', methods=['GET', 'POST'])
 def apply_referer():
     if request.method == "POST":
         full_name = request.form.get("full_name")
         whatsapp = request.form.get("whatsapp_number")
+        account_number = request.form.get("account_number")
+        account_name = request.form.get("account_name")
 
         existing = Referer.query.filter_by(whatsapp=whatsapp).first()
         if existing:
             flash("You have already applied.", "warning")
             return redirect(url_for("main.referer_login"))
 
-        bank_name = request.form.get("bank_name")  # <-- changed from bank_code
-        account_number = request.form.get("account_number")
-        account_name = request.form.get("account_name")
+        # Get bank properly
+        bank_id = request.form.get("bank")
+        bank = Bank.query.get(bank_id)
+        bank_name = bank.name if bank else ""
 
         r = Referer(
             name=full_name,
             whatsapp=whatsapp,
-            bank_code=bank_name,  # store bank name instead of code
+            bank_code=bank_name,
             account_number=account_number,
             account_name=account_name,
             status="pending",
@@ -289,16 +292,15 @@ def apply_referer():
         send_email(
             "New Referer Application",
             [current_app.config["MAIL_USERNAME"]],
-            f"<h3>New Referer Application</h3>"
+            f"<h3>New Referer Application</h3>" 
             f"<p>{r.name} ({r.whatsapp}) applied.</p>"
         )
 
         flash("Application submitted successfully.", "info")
         return redirect(url_for("main.index"))
 
-        banks = Bank.query.all()
-    return render_template("apply_referer.html")
-
+    banks = Bank.query.all()  # make sure variable name matches template
+    return render_template("apply_referer.html", banks=banks)
 
 
 @bp.route("/generate_link/<token>")
@@ -1210,7 +1212,7 @@ def download_documents(staff_id):
     )
 
 
-@app.route('/signup')
+@bp.route('/signup')
 def signup():
     banks = Bank.query.order_by(Bank.name).all()  # fetch all banks
     return render_template('signup.html', banks=banks)
