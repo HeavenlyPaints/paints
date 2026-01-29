@@ -54,6 +54,9 @@ class Referer(db.Model):
     referrals_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), default="pending")
+    bank_id = db.Column(db.Integer, db.ForeignKey('bank.id'), nullable=True)
+    bank = db.relationship('Bank', backref='referers')
+
 
 class Withdrawal(db.Model):
     id = db.Column(db.Integer, primary_key=True)
