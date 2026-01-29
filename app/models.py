@@ -126,7 +126,7 @@ class Staff(db.Model, UserMixin):
         return f"<Staff {self.name} ({self.staff_id}) - Verified: {self.verified}>"
 
 
-class Banks(db.Model):
+class Bank(db.Model):
     __tablename__ = "bank"
 
     id = db.Column(db.Integer, primary_key=True)
