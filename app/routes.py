@@ -421,16 +421,23 @@ def approve_referer(id):
     return redirect(url_for("admin.manage_referers"))
 
 
-@bp.route("/admin/login", methods=["GET","POST"])
+@bp.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     form = AdminLoginForm()
+
     if form.validate_on_submit():
         a = Admin.query.filter_by(username=form.username.data).first()
-        if a and a.check_password(form.password.data):
-           login_user(a)
-           return redirect(url_for("main.admin_dashboard"))
-           flash("Invalid credentials", "danger")
+
+        if not a:
+            flash("Admin user not found", "danger")
+        elif not a.check_password(form.password.data):
+            flash("Wrong password", "danger")
+        else:
+            login_user(a)
+            return redirect(url_for("main.admin_dashboard"))
+
     return render_template("admin/login.html", form=form)
+
 
 
 
