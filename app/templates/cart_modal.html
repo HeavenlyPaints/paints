@@ -1,0 +1,77 @@
+<div id="cart-modal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeCart()" style="width:10px; height:10px;">×</span>
+    <h3>Your Cart</h3>
+
+    <ul id="cart-items"></ul>
+
+    <p id="cart-total">Total: ₦0</p>
+
+    <div class="cart-actions">
+      <button class="btn" onclick="proceedToCheckout()">Checkout</button>
+      <button class="btn" onclick="clearCart()" style="background:red;">Clear Cart</button>
+    </div>
+  </div>
+<div id="cart-modal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeCart()" style="width:10px; height:10px;">×</span>
+    <h3>Your Cart</h3>
+
+    <ul id="cart-items"></ul>
+
+    <p id="cart-total">Total: ₦0</p>
+
+    <div class="cart-actions">
+      <button class="btn" onclick="proceedToCheckout()">Checkout</button>
+      <button class="btn" onclick="clearCart()" style="background:red;">Clear Cart</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #222;
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 6px;
+    opacity: 0;
+    transition: 0.3s ease;
+    z-index: 9999;
+    font-size: 14px;
+"></div>
+
+</div>
+
+<div id="toast" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #222;
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 6px;
+    opacity: 0;
+    transition: 0.3s ease;
+    z-index: 9999;
+    font-size: 14px;
+"></div>
+
+
+<!-- Color Selection Modal -->
+<div id="color-modal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeColorModal()">×</span>
+    <h3>Select Color for Product</h3>
+    <p id="color-product-name"></p>
+
+    <!-- Color input -->
+    <input type="text" id="color-input" placeholder="Type color name..." autocomplete="off"/>
+
+    <!-- Suggested color swatches -->
+    <div id="color-suggestions" style="display:flex; gap:10px; flex-wrap: wrap; margin-top:10px;"></div>
+
+    <button class="btn" id="confirm-color-btn">Add to Cart</button>
+  </div>
+</div>

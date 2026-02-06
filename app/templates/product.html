@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="product-page">
+  <div class="product-left">
+    <img src="{{ url_for('main.uploaded_file', filename=product.image) if product.image else url_for('static', filename='uploads/placeholder.png') }}" alt="{{ product.name }}" class="product-image">
+  </div>
+
+  <div class="product-right">
+    <h2>{{ product.name }}</h2><br>
+    <p>{{ product.description }}</p><br>
+    <div class="price">₦{{ "{:,.2f}".format(product.price) }}</div><br><br>
+
+    <div class="actions">
+      <button class="btn" onclick="openColorPicker('{{ product.id }}')">Add to Cart 🛒</button>
+    </div>
+
+    <!-- YOUR RATING SECTION (UNCHANGED) -->
+    <div class="rating-box">
+      <h3>Rate this product</h3>
+      <div id="star-widget" class="star-widget" data-pid="{{ product.id }}" tabindex="0" aria-label="Rate product">
+        <button class="star" data-value="1" aria-label="1 star">☆</button>
+        <button class="star" data-value="2" aria-label="2 stars">☆</button>
+        <button class="star" data-value="3" aria-label="3 stars">☆</button>
+        <button class="star" data-value="4" aria-label="4 stars">☆</button>
+        <button class="star" data-value="5" aria-label="5 stars">☆</button>
+      </div>
+      <textarea id="rating-comment" placeholder="Leave a comment (optional)"></textarea>
+      <input type="text" id="order-ref" placeholder="Order reference (optional)">
+      <button id="submit-rating" class="btn">Submit Rating</button>
+      <div id="rating-feedback" role="status"></div>
+      <div class="rating-summary">
+        <p>Average: <span id="avg-rating">—</span></p>
+        <p>Total: <span id="total-ratings">0</span></p>
+      </div>
+    </div>
+
+    <div class="rating-chart">
+      <canvas id="ratingsPie" width="300" height="300"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PRODUCT_ID = '{{ product.id }}';
+</script>
+
+<!-- ========================================================= -->
+<!-- ✅ COLOR PICKER MODAL ADDED HERE -->
+<!-- ========================================================= -->
+<div id="colorModal" class="modal" style="display:none;">
+  <div class="modal-content" style="padding:20px; border-radius:10px;">
+    <h3>Select Your Color Preference</h3>
+
+    <input 
+      type="text" 
+      id="colorSearch"
+      placeholder="Type a color (e.g. Blue, Red, Cream)..."
+      onkeyup="searchColors()"
+      style="width:100%; padding:10px; margin-top:10px; margin-bottom:10px;"
+    />
+
+    <div id="colorResults" class="color-list"></div>
+
+    <button class="btn" onclick="closeColorModal()" style="margin-top:10px;">Cancel</button>
+  </div>
+</div>
+
+<style>
+.color-list {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  margin-top: 10px;
+}
+.color-item {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+.color-item img {
+  width: 45px;
+  height: 45px;
+  margin-right: 12px;
+  border: 1px solid #aaa;
+  border-radius: 5px;
+}
+</style>
+
+<script>
+let selectedProductId = null;
+let colorBank = [];
+
+// AUTO LOAD 1000+ COLORS
+async function loadColors() {
+    for (let i = 0; i < 10; i++) {  
+        let url = 
+`https://www.thecolorapi.com/scheme?count=
+100&mode=analogic&hex=${Math.floor(Math.random()*16777215).toString(16)}`;
+        try {
+            let res = await fetch(url);
+            let data = await res.json();
+            data.colors.forEach(c => {
+                colorBank.push({
+                    name: c.name.value,
+                    hex: c.hex.value,
+                    img: c.image.bare
+                });
+            });
+        } catch (e) { console.log("ColorAPI error:", e); }
+    }
+}
+loadColors();
+
+// STEP 1: OPEN POPUP
+function openColorPicker(productId) {
+    selectedProductId = productId;
+    document.getElementById("colorModal").style.display = "block";
+}
+
+// STEP 2: FILTER COLORS BY NAME
+function searchColors() {
+    let query = document.getElementById("colorSearch").value.toLowerCase();
+    let results = document.getElementById("colorResults");
+    results.innerHTML = "";
+
+    let matches = colorBank.filter(c => c.name.toLowerCase().includes(query));
+
+    matches.forEach(color => {
+        let item = document.createElement("div");
+        item.className = "color-item";
+        item.innerHTML = `
+            <img src="${color.img}" />
+            <span>${color.name}</span>
+        `;
+        item.onclick = () => chooseColor(color);
+        results.appendChild(item);
+    });
+}
+
+// STEP 3: SEND TO BACKEND
+function chooseColor(color) {
+    fetch("/add-to-cart-color", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            product_id: selectedProductId,
+            color_name: color.name,
+            color_hex: color.hex
+        })
+    })
+    .then(r => r.json())
+    .then(() => {
+        alert("Added to cart");
+        closeColorModal();
+    });
+}
+
+function closeColorModal() {
+    document.getElementById("colorModal").style.display = "none";
+    document.getElementById("colorSearch").value = "";
+    document.getElementById("colorResults").innerHTML = "";
+}
+</script>
+
+{% endblock %}

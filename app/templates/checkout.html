@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="checkout">
+  <h2>Checkout</h2>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    <label>Name </label><br>{{ form.name }}<br><br>
+    <label>Email </label><br>{{ form.email }}<br><br>
+    <label>Phone </label><br>{{ form.phone }}<br><br>
+    <div class="checkout-actions">
+      <button class="btn" type="submit">Pay with Paystack</button>
+    </div>
+  </form>
+  <div class="cart-overview">
+    <h4>Cart</h4>
+    <ul>
+      {% for it in cart %}
+      <li>{{ it.name }} x{{ it.qty }} — ₦{{ "{:,.2f}".format(it.price * it.qty) }}</li>
+      {% endfor %}
+    </ul>
+    <p>Total: ₦{{ "{:,.2f}".format(amount) }}</p>
+  </div>
+</div>
+{% endblock %}

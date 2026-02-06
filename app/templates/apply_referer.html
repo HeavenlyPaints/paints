@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 style="text-align:center;">Become a Verified Referrer</h2>
+
+<form method="POST" action="{{ url_for('main.apply_referer') }}">
+
+    <label>Full Name: </label>
+    <input type="text" id="full-name" name="full_name" required><br><br>
+
+    <label>WhatsApp Number: </label>
+    <input type="text" name="whatsapp_number" placeholder="2348123456789" required><br><br>
+
+    <label for="bank">Select Your Bank:</label>
+    <select name="bank" id="banks" required>
+        <option value="">--Choose Bank--</option>
+        <option value="Access Bank">Access Bank</option>
+        <option value="Citibank">Citibank</option>
+        <option value="Ecobank">Ecobank</option>
+        <option value="Fidelity Bank">Fidelity Bank</option>
+        <option value="First Bank of Nigeria">First Bank of Nigeria</option>
+        <option value="First City Monument Bank (FCMB)">First City Monument Bank (FCMB)</option>
+        <option value="Globus Bank">Globus Bank</option>
+        <option value="Guaranty Trust Bank (GTBank)">Guaranty Trust Bank (GTBank)</option>
+        <option value="Heritage Bank">Heritage Bank</option>
+        <option value="Keystone Bank">Keystone Bank</option>
+        <option value="Polaris Bank">Polaris Bank</option>
+        <option value="Providus Bank">Providus Bank</option>
+        <option value="Stanbic IBTC Bank">Stanbic IBTC Bank</option>
+        <option value="Standard Chartered Bank">Standard Chartered Bank</option>
+        <option value="Sterling Bank">Sterling Bank</option>
+        <option value="SunTrust Bank">SunTrust Bank</option>
+        <option value="Titan Trust Bank">Titan Trust Bank</option>
+        <option value="Union Bank">Union Bank</option>
+        <option value="United Bank for Africa (UBA)">United Bank for Africa (UBA)</option>
+        <option value="Unity Bank">Unity Bank</option>
+        <option value="Wema Bank">Wema Bank</option>
+        <option value="Zenith Bank">Zenith Bank</option>
+        <option value="Opay">Opay</option>
+        <option value="PalmPay">PalmPay</option>
+        <option value="Kuda Bank">Kuda Bank</option>
+        <option value="Moniepoint">Moniepoint</option>
+    </select><br><br>
+
+    <label>Account Number: </label>
+    <input type="text" id="account-number" name="account_number" maxlength="10" required><br><br>
+
+    <input type="checkbox" id="same-name" />
+    <label for="same-name">Account name same as my full name? </label><br><br>
+
+    <label>Account Name: </label>
+    <input type="text" id="account-name" name="account_name" required><br><br>
+
+    <button type="submit">Complete Registration</button>
+
+</form>
+
+<script>
+// Autofill account name if checkbox is ticked
+document.getElementById('same-name').addEventListener('change', function () {
+    const accountNameField = document.getElementById('account-name');
+    const fullName = document.getElementById('full-name').value.trim();
+
+    if (this.checked) {
+        accountNameField.value = fullName;
+        accountNameField.readOnly = true;  // prevent editing
+    } else {
+        accountNameField.value = '';
+        accountNameField.readOnly = false; // allow manual entry
+    }
+});
+
+// Keep account name updated if full name changes and checkbox is ticked
+document.getElementById('full-name').addEventListener('input', function () {
+    const checkbox = document.getElementById('same-name');
+    const accountNameField = document.getElementById('account-name');
+    if (checkbox.checked) {
+        accountNameField.value = this.value.trim();
+    }
+});
+</script>
+
+<!--
+<script>
+document.getElementById('account-number').addEventListener('input', function () {
+    const bankCode = document.getElementById('bank-select').value;
+    const accNumber = this.value;
+
+    if (bankCode && accNumber.length === 10) {
+        fetch('/verify_account', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                bank_code: bankCode,
+                account_number: accNumber
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.account_name) {
+                document.getElementById('account-name').value = data.account_name;
+            } else {
+                document.getElementById('account-name').value = 'Verification failed';
+            }
+        });
+    }
+});
+</script>
+-->
+{% endblock %}
