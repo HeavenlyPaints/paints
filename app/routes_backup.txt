@@ -1,0 +1,371 @@
+import os, json, uuid, datetime
+from flask import Blueprint, render_template, current_app, request, redirect, url_for, flash, jsonify, send_from_directory, session
+from werkzeug.utils import secure_filename
+from .init import db, login_manager
+from .models import Admin, Product, Order, Referer, Withdrawal, Rating
+from .forms import AdminLoginForm, ProductForm, RefererApplyForm, CheckoutForm, WithdrawalForm, ChangeAdminForm
+from .utils import initialize_paystack, verify_paystack_transaction, validate_paystack_webhook, send_email
+from flask_login import login_user, logout_user, login_required, current_user
+from sqlalchemy import func
+
+bp = Blueprint("main", __name__)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return Admin.query.get(int(user_id))
+
+# ---------- public store ----------
+@bp.route("/")
+def index():
+    products = Product.query.order_by(Product.created_at.desc()).all()
+    total_ordered = db.session.query(func.sum(Product.sold)).scalar() or 0
+    total_delivered = db.session.query(func.sum(Product.delivered)).scalar() or 0
+    return render_template("index.html", products=products, total_ordered=total_ordered, total_delivered=total_delivered, paystack_public=current_app.config.get("PAYSTACK_PUBLIC"))
+
+@bp.route("/product/<int:pid>")
+def product(pid):
+    p = Product.query.get_or_404(pid)
+    return render_template("product.html", product=p)
+
+# Ratings & summary
+@bp.route("/rate", methods=["POST"])
+def rate_product():
+    data = request.get_json(force=True)
+    product_id = data.get("product_id")
+    stars = data.get("stars")
+    comment = data.get("comment")
+    order_ref = data.get("order_ref")
+    if not product_id or not stars:
+        return jsonify({"status": False, "message": "product_id and stars required"}), 400
+    try:
+        product_id = int(product_id); stars = int(stars)
+    except:
+        return jsonify({"status": False, "message": "invalid types"}), 400
+    if stars < 1 or stars > 5:
+        return jsonify({"status": False, "message": "stars must be 1-5"}), 400
+    product = Product.query.get(product_id)
+    if not product:
+        return jsonify({"status": False, "message": "product not found"}), 404
+    order_id = None
+    if order_ref:
+        o = Order.query.filter_by(reference=order_ref).first()
+        if o and o.delivered:
+            order_id = o.id
+        else:
+            # Prevent ratings if order not delivered (policy)
+            return jsonify({"status": False, "message": "Order not delivered or invalid"}), 400
+    rating = Rating(product_id=product_id, stars=stars, comment=comment, order_id=order_id)
+    db.session.add(rating)
+    db.session.commit()
+    summary = compute_ratings_summary(product_id)
+    return jsonify({"status": True, "message": "saved", "summary": summary}), 201
+
+@bp.route("/ratings-summary")
+def ratings_summary():
+    pid = request.args.get("product_id", type=int)
+    if not pid:
+        return jsonify({"status": False, "message": "product_id required"}), 400
+    product = Product.query.get(pid)
+    if not product:
+        return jsonify({"status": False, "message": "product not found"}), 404
+    summary = compute_ratings_summary(pid)
+    return jsonify({"status": True, "summary": summary})
+
+def compute_ratings_summary(product_id):
+    counts = db.session.query(Rating.stars, func.count(Rating.id)).filter(Rating.product_id == product_id).group_by(Rating.stars).all()
+    counts_map = {s: c for s, c in counts}
+    values = [int(counts_map.get(i, 0)) for i in range(1,6)]
+    total = sum(values)
+    average = round(sum((i * values[i-1]) for i in range(1,6)) / total, 2) if total else 0.0
+    labels = [f"{i}★" for i in range(1,6)]
+    return {"product_id": product_id, "total": total, "average": average, "labels": labels, "values": values}
+
+# ---------- cart API (session-based) ----------
+def _get_cart():
+    return session.get('cart', [])
+
+def _save_cart(cart):
+    session['cart'] = cart
+
+@bp.route("/cart/add", methods=["POST"])
+def cart_add():
+    payload = request.get_json(force=True)
+    pid = int(payload.get("product_id"))
+    qty = int(payload.get("qty", 1))
+    p = Product.query.get_or_404(pid)
+    cart = _get_cart()
+    for it in cart:
+        if it['product_id'] == pid:
+            it['qty'] += qty
+            break
+    else:
+        cart.append({"product_id": pid, "name": p.name, "price": p.price, "qty": qty})
+    _save_cart(cart)
+    return jsonify({"status": True, "cart": cart})
+
+@bp.route("/cart/remove", methods=["POST"])
+def cart_remove():
+    payload = request.get_json(force=True)
+    pid = int(payload.get("product_id"))
+    cart = _get_cart()
+    cart = [it for it in cart if it['product_id'] != pid]
+    _save_cart(cart)
+    return jsonify({"status": True, "cart": cart})
+
+@bp.route("/cart")
+def cart_view():
+    return jsonify({"cart": _get_cart()})
+
+# ---------- checkout & paystack ----------
+@bp.route("/checkout", methods=["GET","POST"])
+def checkout():
+    form = CheckoutForm()
+    cart = _get_cart()
+    if not cart:
+        flash("Cart is empty", "warning")
+        return redirect(url_for("main.index"))
+    amount = sum([it['price'] * it['qty'] for it in cart])
+    if form.validate_on_submit():
+        reference = uuid.uuid4().hex
+        order = Order(reference=reference, name=form.name.data, email=form.email.data, phone=form.phone.data, items=json.dumps(cart), amount=amount)
+        db.session.add(order); db.session.commit()
+        callback = url_for("main.paystack_callback", _external=True)
+        init = initialize_paystack(reference, order.email, amount, callback)
+        if init.get("status"):
+            # Clear session cart; actual order items recorded server-side already
+            session.pop('cart', None)
+            return redirect(init["data"]["authorization_url"])
+        else:
+            flash("Payment initialization failed", "danger")
+            return redirect(url_for("main.checkout"))
+    return render_template("checkout.html", form=form, cart=cart, amount=amount)
+
+@bp.route("/paystack/callback")
+def paystack_callback():
+    reference = request.args.get("reference")
+    if not reference:
+        flash("Invalid payment callback", "danger")
+        return redirect(url_for("main.index"))
+    res = verify_paystack_transaction(reference)
+    if res.get("status") and res["data"]["status"] == "success":
+        order = Order.query.filter_by(reference=reference).first()
+        if order:
+            order.paid = True
+            db.session.commit()
+            items = json.loads(order.items)
+            for it in items:
+                p = Product.query.get(it['product_id'])
+                if p:
+                    p.sold += it['qty']
+            db.session.commit()
+            # attribute referral earnings if session had ref_token
+            token = session.get('ref_token')
+            if token:
+                r = Referer.query.filter_by(token=token, approved=True).first()
+                if r:
+                    # default 9% earn; if referer is buyer (same whatsapp?), handled later
+                    earn = int(order.amount * 0.09)
+                    r.earnings += earn
+                    r.referrals_count += 1
+                    db.session.commit()
+                    # badge check
+                    badge, pct = badge_for_count(r.referrals_count)
+                    if badge:
+                        send_email("Badge achieved", [r.email or current_app.config.get('MAIL_USERNAME')], f"<p>Congrats {r.name}, you earned {badge} badge ({pct}%)</p>")
+            send_email("Order successful", [order.email], f"<p>Payment for order {order.reference} successful.</p>")
+            send_email("New order received", [current_app.config.get("MAIL_USERNAME")], f"<p>Order {order.reference} placed.</p>")
+            flash("Payment confirmed. Order placed.", "success")
+            return redirect(url_for("main.index"))
+    flash("Payment verification failed", "danger")
+    return redirect(url_for("main.index"))
+
+@bp.route("/webhook/paystack", methods=["POST"])
+def paystack_webhook():
+    if not validate_paystack_webhook(request):
+        return jsonify({"status": False}), 400
+    payload = request.get_json()
+    event = payload.get("event")
+    if event == "charge.success":
+        ref = payload["data"]["reference"]
+        order = Order.query.filter_by(reference=ref).first()
+        if order and not order.paid:
+            order.paid = True
+            db.session.commit()
+    return jsonify({"status": True}), 200
+
+# ---------- referer apply & generate link ----------
+@bp.route("/apply", methods=["GET","POST"])
+def apply_referer():
+    form = RefererApplyForm()
+    if form.validate_on_submit():
+        whatsapp = form.whatsapp.data or form.phone.data
+        r = Referer(name=form.name.data, phone=form.phone.data, email=form.email.data, whatsapp=whatsapp)
+        db.session.add(r)
+        db.session.commit()
+        send_email("Referer application", [current_app.config.get("MAIL_USERNAME")], f"<p>{r.name} applied for referer.</p>")
+        flash("Application submitted. Admin will review", "info")
+        return redirect(url_for("main.index"))
+    return render_template("apply_referer.html", form=form)
+
+@bp.route("/generate_link/<token>")
+def generate_link(token):
+    r = Referer.query.filter_by(token=token, approved=True).first_or_404()
+    link = url_for("main.index", _external=True) + f"?ref={r.token}"
+    return jsonify({"link": link})
+
+# capture ref token in query param
+@bp.before_app_request
+def capture_ref():
+    ref = request.args.get('ref')
+    if ref:
+        session['ref_token'] = ref
+
+# ---------- withdrawals ----------
+@bp.route("/referer/withdraw", methods=["POST"])
+def referer_withdraw():
+    data = request.get_json(force=True)
+    token = data.get("token")
+    amount = int(data.get("amount", 0))
+    account = data.get("account")
+    if not token or not amount or not account:
+        return jsonify({"status": False, "message": "token, amount, account required"}), 400
+    r = Referer.query.filter_by(token=token, approved=True).first_or_404()
+    if amount > r.earnings:
+        return jsonify({"status": False, "message": "insufficient funds"}), 400
+    r.earnings -= amount
+    w = Withdrawal(referer_id=r.id, amount=amount, account_details=account, status='pending')
+    db.session.add(w)
+    db.session.commit()
+    send_email("Withdrawal request", [current_app.config.get("MAIL_USERNAME")], f"<p>{r.name} requested withdrawal {amount}</p>")
+    return jsonify({"status": True, "message": "withdrawal requested"})
+
+# ---------- admin routes ----------
+@bp.route("/admin/login", methods=["GET","POST"])
+def admin_login():
+    form = AdminLoginForm()
+    if form.validate_on_submit():
+        a = Admin.query.filter_by(username=form.username.data).first()
+        if a and a.check_password(form.password.data):
+            login_user(a)
+            return redirect(url_for("main.admin_dashboard"))
+        flash("Invalid credentials", "danger")
+    return render_template("admin/login.html", form=form)
+
+@bp.route("/admin/logout")
+@login_required
+def admin_logout():
+    logout_user()
+    return redirect(url_for("main.admin_login"))
+
+@bp.route("/admin/dashboard")
+@login_required
+def admin_dashboard():
+    products = Product.query.order_by(Product.created_at.desc()).all()
+    orders = Order.query.order_by(Order.created_at.desc()).limit(50).all()
+    referers = Referer.query.order_by(Referer.created_at.desc()).all()
+    # monthly stacked orders counts
+    monthly = db.session.query(func.strftime("%Y-%m", Order.created_at), func.count(Order.id)).group_by(func.strftime("%Y-%m", Order.created_at)).all()
+    # compute totals
+    monthly_earnings = sum([o.amount for o in orders if o.paid])
+    return render_template("admin/dashboard.html", products=products, orders=orders, referers=referers, monthly=monthly, monthly_earnings=monthly_earnings, orders_count=len(orders), referrers_count=len(referers))
+
+@bp.route("/admin/product/add", methods=["GET","POST"])
+@login_required
+def add_product():
+    form = ProductForm()
+    if form.validate_on_submit():
+        filename = None
+        f = form.image.data
+        if f:
+            fname = secure_filename(f.filename)
+            path = os.path.join(current_app.config['UPLOAD_FOLDER'], fname)
+            f.save(path)
+            filename = fname
+        p = Product(name=form.name.data, description=form.description.data, price=form.price.data, image=filename)
+        db.session.add(p); db.session.commit()
+        flash("Product added", "success")
+        return redirect(url_for("main.admin_dashboard"))
+    return render_template("admin/add_product.html", form=form)
+
+@bp.route("/admin/product/delete/<int:pid>", methods=["POST"])
+@login_required
+def admin_delete_product(pid):
+    p = Product.query.get_or_404(pid)
+    db.session.delete(p); db.session.commit()
+    flash("Product deleted", "info")
+    return redirect(url_for("main.admin_dashboard"))
+
+@bp.route("/admin/referer-requests")
+@login_required
+def referer_requests():
+    requests_ = Referer.query.filter_by(approved=False).all()
+    return render_template("admin/referer_requests.html", requests=requests_)
+
+@bp.route("/admin/approve-referer/<int:id>", methods=["POST"])
+@login_required
+def approve_referer(id):
+    r = Referer.query.get_or_404(id)
+    r.approved = True
+    db.session.commit()
+    send_email("Approved", [r.email or current_app.config.get("MAIL_USERNAME")], f"<p>Your referer application approved. Token: {r.token}</p>")
+    flash("Referer approved", "success")
+    return redirect(url_for("main.referer_requests"))
+
+@bp.route("/admin/reject-referer/<int:id>", methods=["POST"])
+@login_required
+def reject_referer(id):
+    r = Referer.query.get_or_404(id)
+    db.session.delete(r)
+    db.session.commit()
+    flash("Referer rejected", "info")
+    return redirect(url_for("main.referer_requests"))
+
+@bp.route("/admin/withdrawals")
+@login_required
+def admin_withdrawals():
+    ws = Withdrawal.query.order_by(Withdrawal.created_at.desc()).all()
+    return render_template("admin/withdrawals.html", withdrawals=ws)
+
+@bp.route("/admin/withdrawals/pay/<int:id>", methods=["POST"])
+@login_required
+def admin_pay_withdrawal(id):
+    w = Withdrawal.query.get_or_404(id)
+    w.status = 'paid'
+    db.session.commit()
+    flash("Marked as paid", "success")
+    return redirect(url_for("main.admin_withdrawals"))
+
+@bp.route("/admin/change-credentials", methods=["GET","POST"])
+@login_required
+def admin_change_credentials():
+    form = ChangeAdminForm()
+    if form.validate_on_submit():
+        current_user.username = form.username.data
+        current_user.set_password(form.password.data)
+        db.session.commit()
+        flash("Credentials updated", "success")
+        return redirect(url_for("main.admin_dashboard"))
+    return render_template("admin/change_credentials.html", form=form)
+
+# ---------- referer dashboard ----------
+@bp.route("/referer/<token>/dashboard")
+def referer_dashboard(token):
+    r = Referer.query.filter_by(token=token).first_or_404()
+    # monthly earn simple calc (reset yearly)
+    monthly_earn = r.earnings  # for demo, same as earnings
+    badge, pct = badge_for_count(r.referrals_count)
+    return render_template("referer/dashboard.html", referrer=r, monthly_earnings=monthly_earn, badge=badge, pct=pct)
+
+# ---------- static uploads serving (if needed) ----------
+@bp.route("/uploads/<filename>")
+def uploaded_file(filename):
+    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
+
+# ---------- helpers ----------
+def badge_for_count(count):
+    if count >= 19: return ("Sapphire", 15)
+    if count >= 15: return ("Platinum", 13)
+    if count >= 11: return ("Gold", 12)
+    if count >= 8: return ("Silver", 11)
+    if count >= 5: return ("Wood", 10)
+    return (None, 9)
