@@ -4,7 +4,11 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_mailman import Mail
+from dotenv import load_dotenv
 from config import Config
+
+
+load_dotenv()
 
 db = SQLAlchemy()
 migrate = Migrate()
