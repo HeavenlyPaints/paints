@@ -56,21 +56,19 @@
 </form>
 
 <script>
-// Autofill account name if checkbox is ticked
 document.getElementById('same-name').addEventListener('change', function () {
     const accountNameField = document.getElementById('account-name');
     const fullName = document.getElementById('full-name').value.trim();
 
     if (this.checked) {
         accountNameField.value = fullName;
-        accountNameField.readOnly = true;  // prevent editing
+        accountNameField.readOnly = true;
     } else {
         accountNameField.value = '';
-        accountNameField.readOnly = false; // allow manual entry
+        accountNameField.readOnly = false;
     }
 });
 
-// Keep account name updated if full name changes and checkbox is ticked
 document.getElementById('full-name').addEventListener('input', function () {
     const checkbox = document.getElementById('same-name');
     const accountNameField = document.getElementById('account-name');
@@ -80,31 +78,4 @@ document.getElementById('full-name').addEventListener('input', function () {
 });
 </script>
 
-<!--
-<script>
-document.getElementById('account-number').addEventListener('input', function () {
-    const bankCode = document.getElementById('bank-select').value;
-    const accNumber = this.value;
-
-    if (bankCode && accNumber.length === 10) {
-        fetch('/verify_account', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                bank_code: bankCode,
-                account_number: accNumber
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.account_name) {
-                document.getElementById('account-name').value = data.account_name;
-            } else {
-                document.getElementById('account-name').value = 'Verification failed';
-            }
-        });
-    }
-});
-</script>
--->
 {% endblock %}

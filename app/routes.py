@@ -374,7 +374,6 @@ def apply_referer():
             return redirect(url_for("main.referer_login"))
 
         bank = Bank.query.filter_by(name=bank_name).first()
-        # generate a unique token for this referer
         token = uuid.uuid4().hex
 
         r = Referer(
@@ -399,7 +398,6 @@ def apply_referer():
             f"<p>{r.name} ({r.whatsapp}) applied.</p>"
         )
 
-        # redirect to pending page immediately
         return redirect(url_for("main.referer_pending", token=r.token))
 
     return render_template("apply_referer.html")
@@ -523,7 +521,6 @@ def referer_login():
             flash("Your application was rejected.", "danger")
             return redirect(url_for("main.referer_login"))
 
-        # approved referers go to dashboard
         return redirect(url_for("main.referer_dashboard", token=referer.token))
 
     return render_template("referer_login.html")
@@ -583,7 +580,6 @@ def admin_verify_pickup():
             "remaining_quantity": item.remaining_quantity
         })
 
-    # **Automatically mark delivered if all items collected**
     if order.is_fully_collected:
         order.delivered = True
         order.pickup_expired = True
@@ -605,12 +601,7 @@ def collect_items():
     data = request.get_json()
 
     order_id = data.get("order_id")
-    updates = data.get("updates")  
-    # Expected format:
-    # updates = [
-    #   {"item_id": 1, "collect_qty": 2},
-    #   {"item_id": 2, "collect_qty": 1}
-    # ]
+    updates = data.get("updates")
 
     order = Order.query.get(order_id)
 
@@ -641,7 +632,7 @@ def collect_items():
         item.collected_quantity += collect_qty
         item.product.delivered += collect_qty
 
-    # After updating items, check if fully collected
+
     if order.is_fully_collected:
         order.delivered = True
         order.pickup_expired = True
@@ -690,7 +681,7 @@ def admin_login():
             return redirect(url_for("main.admin_dashboard"))
         else:
             flash("Invalid username or password", "danger")
-            return redirect(url_for("main.admin_login"))  # ✅ redirect triggers one-time flash
+            return redirect(url_for("main.admin_login"))
 
     return render_template("admin/login.html", form=form)
 
@@ -717,23 +708,19 @@ def add_no_cache_headers(response):
 @bp.route("/admin/dashboard")
 @login_required
 def admin_dashboard():
-    # Only admin can access
     if current_user.username != 'admin':
         flash("Access denied!", "danger")
         return redirect(url_for('main.index'))
 
-    # Fetch products
+
     products = Product.query.all()
 
-    # Fetch referrers by status
     pending_referers = Referer.query.filter_by(status="pending").all()
     approved_referers = Referer.query.filter_by(status="approved").all()
     rejected_referers = Referer.query.filter_by(status="rejected").all()
 
-    # Fetch all orders (recent first)
     orders = Order.query.order_by(Order.created_at.desc()).all()
 
-    # Monthly earnings calculation
     now = datetime.utcnow()
     start_of_month = datetime(now.year, now.month, 1)
     start_of_next_month = datetime(now.year + 1, 1, 1) if now.month == 12 else datetime(now.year, now.month + 1, 1)
@@ -754,7 +741,7 @@ def admin_dashboard():
         pending_referers=pending_referers,
         approved_referers=approved_referers,
         rejected_referers=rejected_referers,
-        orders=orders,                 # pass orders for delivered/shipped display
+        orders=orders,
         monthly_earnings=monthly_earnings,
         orders_count=orders_count,
         referrers_count=referrers_count
@@ -1153,25 +1140,6 @@ def staff_forgot_password():
 
     return render_template('staff/forgot_password.html')
 
-#@bp.route('/staff/reset-password/<token>', methods=['GET', 'POST'])
-#def staff_reset_password(token):
- #   staff = Staff.query.filter_by(reset_token=token).first()
-
-  #  if not staff or staff.reset_token_expires < datetime.utcnow():
-   #     flash("Reset link is invalid or expired")
-    #    return redirect(url_for('main.staff_login'))
-
-#    if request.method == 'POST':
- #       new_password = request.form['password']
-  #      staff.password = generate_password_hash(new_password)
-   #     staff.reset_token = None
-    #    staff.reset_token_expires = None
-     #   db.session.commit()
-
-      #  flash("Password updated. You can log in now.")
-     #   return redirect(url_for('main.staff_login'))
-
-   # return render_template('staff/reset_password.html')
 
 
 

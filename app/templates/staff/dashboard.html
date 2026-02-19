@@ -41,14 +41,12 @@
   {% elif staff.verification_status == 'approved' %}
     <div class="dashboard-approved">
 
-      <!-- PROFILE IMAGE (TOP LEFT) -->
       <div class="profile-box">
         {% if staff.profile_image %}
           <img src="{{ url_for('static', filename=staff.profile_image) }}" alt="Profile">
         {% endif %}
       </div>
 
-      <!-- CENTER CONTENT -->
       <div class="dashboard-card center">
         <h2>Welcome {{ staff.username }}</h2>
 

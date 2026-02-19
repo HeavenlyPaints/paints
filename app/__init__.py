@@ -27,4 +27,16 @@ def create_app():
     app.register_blueprint(main_bp)
 
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+    with app.app_context():
+        from app.models import User
+        db.create_all()
+
+        if not User.query.filter_by(username="admin").first():
+            admin = User(username="tara", email="admin@test.com")
+            admin.set_password("myTara!")
+            db.session.add(admin)
+            db.session.commit()
+
     return app
+

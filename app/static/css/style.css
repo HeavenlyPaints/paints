@@ -573,28 +573,27 @@ form textarea:focus {
 }
 
 video {
-  width: 200px;          /* set your size */
-  height: 200px;         /* same as width */
-  border-radius: 50%;    /* makes it circular */
-  object-fit: cover;     /* fills the circle without distortion */
-  display: none;         /* keep hidden until camera starts */
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: none;
   border: 4px groove  var(--accent);
   box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 }
 
 
 #color-suggestions {
-  max-height: 200px;        /* adjust height as needed */
-  overflow-y: auto;         /* vertical scroll */
+  max-height: 200px;
+  overflow-y: auto;
   padding: 4px;
   margin-top: 8px;
-  border-top: 1px solid #ccc; /* optional: visual separation */
+  border-top: 1px solid #ccc;
   display: flex;
-  flex-wrap: wrap;          /* keep swatches in rows */
+  flex-wrap: wrap;
   gap: 6px;
 }
 
-/* Optional: scrollbar styling for Webkit (Chrome, Safari) */
 #color-suggestions::-webkit-scrollbar {
   width: 6px;
 }

@@ -2,17 +2,15 @@
 {% block content %}
 
 <style>
-/* Dashboard wrapper */
 .dashboard-wrapper {
   display: flex;
-  flex-wrap: wrap;      /* wrap cards on smaller screens */
+  flex-wrap: wrap;
   gap: 20px;
   justify-content: flex-start;
 }
 
-/* Each card */
 .dashboard-card {
-  flex: 1 1 300px;       /* grow/shrink, min-width 300px */
+  flex: 1 1 300px;
   min-width: 280px;
   background: #fff;
   padding: 20px;
@@ -21,26 +19,24 @@
   box-sizing: border-box;
 }
 
-/* Tables inside cards */
 .table-wrapper {
   width: 100%;
-  overflow-x: auto;      /* scroll if table too wide */
+  overflow-x: auto;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 400px;      /* ensures table doesn’t collapse too small */
+  min-width: 400px;
 }
 
 .table th, .table td {
   border: 1px solid #ddd;
   padding: 10px;
-  white-space: nowrap;   /* prevent breaking cells */
+  white-space: nowrap;
   text-align: left;
 }
 
-/* Buttons */
 .btn {
   padding: 6px 12px;
   border: none;
@@ -49,7 +45,6 @@
 }
 .btn.small { padding: 4px 8px; font-size: 0.9em; }
 
-/* Status */
 .status.pending { color: orange; font-weight: bold; }
 </style>
 
@@ -58,7 +53,6 @@
 <h2>Sales Attendant Dashboard</h2>
 <div class="dashboard-wrapper">
 
-  <!-- Profile Card -->
   <div class="dashboard-card">
     <p><strong>Name:</strong> {{ staff.name }}</p>
     <p><strong>Staff ID:</strong> {{ staff.staff_id }}</p>
@@ -68,7 +62,7 @@
     </a>
   </div>
 
-  <!-- Products Card -->
+
   <div class="dashboard-card">
     <h3>Products</h3>
     <div class="table-wrapper">
@@ -93,7 +87,6 @@
     </div>
   </div>
 
-  <!-- Orders Card -->
   <div class="dashboard-card">
     <h3>Orders</h3>
     <div class="table-wrapper">

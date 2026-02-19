@@ -1,4 +1,3 @@
-// Cart (session via server) — UI uses fetch endpoints
 async function updateCartCount(){
   const res = await fetch('/cart');
   const data = await res.json();
@@ -16,28 +15,28 @@ function closeCart(){
   document.getElementById('cart-modal').style.display='none'; 
 }
 
-// ✅ CLEAR CART FUNCTION (newly added)
+
 async function clearCart(){
   const res = await fetch('/cart/clear', {
       method: 'POST'
   });
   const data = await res.json();
 
-  // Reset UI
+
   document.getElementById('cart-items').innerHTML = '';
   document.getElementById('cart-total').textContent = `Total: ₦0`;
 
-  // Update cart icon number
+
   updateCartCount();
 
-  // Close modal
+
   closeCart();
 
-  // Toast
+
   showToast("Cart cleared successfully");
 }
 
-// --------------------- RENDER CART ---------------------
+
 async function renderCart(){
   const res = await fetch('/cart');
   const data = await res.json();
@@ -51,7 +50,7 @@ async function renderCart(){
     li.style.alignItems = 'center';
     li.style.gap = '10px';
 
-    // Product text
+
     const text = document.createElement('span');
     text.textContent = `${it.name} x${it.qty} — ₦${(it.price * it.qty).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     li.appendChild(text);
@@ -63,9 +62,7 @@ if(it.product_type){
   li.appendChild(type);
 }
 
-    // Color swatch
-    // Color swatch + name
-// --- COLOR DISPLAY ---
+
 const colorWrapper = document.createElement('div');
 colorWrapper.style.display = 'flex';
 colorWrapper.style.alignItems = 'center';
@@ -89,7 +86,7 @@ li.appendChild(colorWrapper);
 
 
 
-    // Delete button
+
     const del = document.createElement('button');
     del.textContent = 'Delete';
     del.onclick = async ()=>{
@@ -110,9 +107,9 @@ li.appendChild(colorWrapper);
   document.getElementById('cart-total').textContent = 
     `Total: ₦${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
 }
-// --------------------- END RENDER CART ---------------------
+
 async function addToCart(pid, qty=1, color=null){
-  // color is optional, default null
+
   const payload = {
     product_id: pid,
     qty: qty,
@@ -147,9 +144,7 @@ let selectedColor = null;
 let colorBank = [];
 
 
-/* -----------------------------
-   LOAD COLORS ONCE
------------------------------ */
+
 async function loadColors() {
     if (colorBank.length) return;
 
@@ -171,18 +166,14 @@ async function loadColors() {
     }
 }
 
-/* -----------------------------
-   OPEN COLOR MODAL
------------------------------ */
+
 function openColorPicker(productId) {
     selectedProductId = productId;
     document.getElementById("colorModal").style.display = "block";
     loadColors();
 }
 
-/* -----------------------------
-   SEARCH COLORS
------------------------------ */
+
 function searchColors() {
     const query = document.getElementById("colorSearch").value.toLowerCase();
     const results = document.getElementById("colorResults");
@@ -205,19 +196,15 @@ function searchColors() {
       });
 }
 
-/* -----------------------------
-   ADD TO CART (SINGLE SOURCE)
------------------------------ */
+
 function selectColor(color){
     if(!selectedProductId) return;
-    addToCart(selectedProductId, 1, color); // use the unified function
+    addToCart(selectedProductId, 1, color);
     closeColorModal();
 }
 
 
-/* -----------------------------
-   CLOSE MODAL
------------------------------ */
+
 function closeColorModal() {
     document.getElementById("colorModal").style.display = "none";
     document.getElementById("colorSearch").value = "";
@@ -226,8 +213,7 @@ function closeColorModal() {
 
 
 
-// ---- Replace only the color-input listener with this block ----
-// Open modal
+
 function openColorModal(productId, productName){
   selectedProductId = productId;
   selectedColor = null;
@@ -237,14 +223,14 @@ function openColorModal(productId, productName){
   document.getElementById('color-modal').style.display = 'block';
 }
 
-// Close modal
+
 function closeColorModal(){
   document.getElementById('color-modal').style.display = 'none';
   selectedProductId = null;
   selectedColor = null;
 }
 
-// Color input listener
+
 document.getElementById('color-input').addEventListener('input', async function(){
   const raw = this.value.trim();
   const suggestionsDiv = document.getElementById('color-suggestions');
@@ -264,7 +250,6 @@ document.getElementById('color-input').addEventListener('input', async function(
 
   let mainColor=null, mainName=null, mainHex=null;
 
-  // STEP 1: Browser validation
   for(const c of candidates){
     if(browserColorValid(c)){
       mainColor = c; mainName=c;
@@ -280,7 +265,7 @@ document.getElementById('color-input').addEventListener('input', async function(
     }
   }
 
-  // STEP 2: API fallback
+
   if(!mainColor){
     try{
       const res = await fetch(`https://www.thecolorapi.com/scheme?hex=${encodeURIComponent(raw.replace('#',''))}&mode=monochrome&count=1`);
@@ -295,14 +280,14 @@ document.getElementById('color-input').addEventListener('input', async function(
     }catch{}
   }
 
-  // STEP 3: fallback
+
   if(!mainColor){
     mainColor = '#CCCCCC';
     mainHex = '#CCCCCC';
     mainName = raw;
   }
 
-  // STEP 4: render main swatch
+
   const wrapper = document.createElement('div');
   wrapper.style.display = 'inline-block';
   wrapper.style.margin='4px';
@@ -331,7 +316,7 @@ document.getElementById('color-input').addEventListener('input', async function(
   wrapper.appendChild(lbl);
   suggestionsDiv.appendChild(wrapper);
 
-  // STEP 5: related colors (analogous)
+
   try{
     const schemeRes = await fetch(`https://www.thecolorapi.com/scheme?hex=${mainHex.replace('#','')}&mode=analogic&count=5`);
     if(schemeRes.ok){
@@ -373,7 +358,7 @@ document.getElementById('color-input').addEventListener('input', async function(
   }catch{}
 });
 
-// Confirm and add to cart
+
 document.getElementById('confirm-color-btn').addEventListener('click', async () => {
   if (!selectedProductId || !selectedColor) {
     alert('Please select a color.');
@@ -381,13 +366,12 @@ document.getElementById('confirm-color-btn').addEventListener('click', async () 
   }
 
   try {
-    // Call the unified function
+
     await addToCart(selectedProductId, 1, selectedColor);
 
-    // Close the color modal
+
     closeColorModal();
 
-    // Show toast
     if (typeof showToast === 'function') showToast('Added to cart with selected color');
   } catch (err) {
     console.error(err);
@@ -396,14 +380,14 @@ document.getElementById('confirm-color-btn').addEventListener('click', async () 
 });
 
 
-// Checkout button
+
 function proceedToCheckout(){
   window.location.href='/checkout';
 }
 
 
 
-// Rating widget on product page
+
 document.addEventListener('DOMContentLoaded', function(){
   const starWidget = document.getElementById('star-widget');
   if(starWidget){
@@ -488,19 +472,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
 (function () {
 
-  // 🚫 Mobile: do NOTHING (use native scroll)
   if (window.matchMedia("(max-width: 768px)").matches) {
     return;
   }
 
-  // 🖥 Desktop only from here
   let currentScroll = window.scrollY;
   let targetScroll = window.scrollY;
 
-  const ease = 0.06;     // faster than 0.02 (less lag)
-  const maxDelta = 120;  // allow natural wheel movement
+  const ease = 0.06;
+  const maxDelta = 120;
 
-  // Wheel / Trackpad (desktop)
   window.addEventListener(
     "wheel",
     (e) => {
@@ -537,7 +518,7 @@ const facePreview = document.getElementById('facePreview');
 const faceError = document.getElementById('faceError');
 const startCameraBtn = document.getElementById('startCamera');
 
-/* ---------------- CAMERA CONTROL ---------------- */
+
 
 startCameraBtn.onclick = async () => {
   if (!stream) {
@@ -548,7 +529,6 @@ startCameraBtn.onclick = async () => {
   }
 };
 
-/* ---------------- FACE CAPTURE ---------------- */
 
 function capture() {
   if (!stream) return;
@@ -569,7 +549,6 @@ function capture() {
 
   const dataURL = canvas.toDataURL('image/png');
 
-  // Basic face validation (brightness + shape check)
   if (!isLikelyFace(ctx, size)) {
     faceError.style.display = 'block';
     return;
@@ -584,7 +563,7 @@ function capture() {
   stopCamera();
 }
 
-/* ---------------- SIMPLE FACE VALIDATION ---------------- */
+
 
 function isLikelyFace(ctx, size) {
   const imageData = ctx.getImageData(0, 0, size, size).data;
@@ -595,10 +574,10 @@ function isLikelyFace(ctx, size) {
     if (brightness > 60) brightPixels++;
   }
 
-  return brightPixels > (size * size * 0.25); // threshold
+  return brightPixels > (size * size * 0.25);
 }
 
-/* ---------------- STOP CAMERA ---------------- */
+
 
 function stopCamera() {
   if (stream) {
@@ -608,7 +587,7 @@ function stopCamera() {
   }
 }
 
-/* ---------------- PHASE NAV ---------------- */
+
 
 function validateFaceAndProceed() {
   if (!imageInput.value) {
@@ -628,7 +607,6 @@ function prevPhase(current) {
   document.getElementById(`phase${current - 1}`).style.display = 'block';
 }
 
-/* ---------------- CLICK TO VIEW FULL IMAGE ---------------- */
 
 facePreview.onclick = () => {
   const win = window.open();
@@ -746,7 +724,6 @@ async function verifyPickup(code, btn) {
         alert(data.message);
 
         if (data.success) {
-            // optionally update the row to show Delivered
             const row = btn.closest('tr');
             row.querySelector('.delivered-status').textContent = 'Yes';
             btn.disabled = true;
