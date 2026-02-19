@@ -32,11 +32,10 @@ def create_app():
         from app.models import Admin
         db.create_all()
 
-        if not User.query.filter_by(username="admin").first():
-            admin = User(username="admin", email="admin@test.com")
+        if not Admin.query.filter_by(username="admin").first():
+            admin = Admin(username="admin", email="admin@test.com")
             admin.set_password("myTara!")
             db.session.add(admin)
             db.session.commit()
 
     return app
-
