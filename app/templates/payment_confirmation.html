@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="confirmation-box">
+  <h2>Payment Successful 🎉</h2>
+
+  <p><b>Order Reference:</b> {{ order.reference }}</p>
+
+  <div class="pickup-code-box">
+    <p>Your Pickup Code</p>
+    <h1 id="pickupCode">{{ order.pickup_code }}</h1>
+
+    <button onclick="copyCode()" class="btn btn-primary">
+      Copy Code
+    </button>
+
+<button onclick="resend()" class="btn btn-secondary mt-2">
+  Resend Pickup Code
+</button>
+  </div>
+
+  <p class="warning">
+    ⚠️ Please screenshot or save this code.  
+    You will need it to collect your product.
+  </p>
+
+</div>
+
+<script>
+function copyCode() {
+  navigator.clipboard.writeText(
+    document.getElementById("pickupCode").innerText
+  );
+  alert("Pickup code copied!");
+}
+</script>
+
+<script>
+function resend() {
+  fetch("/resend-pickup-code", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      reference: "{{ order.reference }}",
+      email: "{{ order.email }}"
+    })
+  })
+  .then(r => r.json())
+  .then(d => alert(d.message));
+}
+</script>
+
+{% endblock %}

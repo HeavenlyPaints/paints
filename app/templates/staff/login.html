@@ -12,7 +12,12 @@
 <form method="POST">
   <input name="username" placeholder="Username" required>
   <input name="password" type="password" placeholder="Password" required>
-  <button type="submit" class="btn">Login</button>
+  <button type="submit" class="btn">Login</button><br><br>
+
+  <a href="{{ url_for('main.staff_forgot_password') }}">
+  Forgot password?
+</a>
+
 </form>
 
 {% endblock %}

@@ -1,10 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
+
 <section class="hero">
-
-
   <h1>Welcome to Heavenly Paint Limited</h1>
-  <p>all colors starts  with <i>You<i></p>
+  <p>All colors start with <i>You</i></p>
 </section>
 
 <section class="product-grid">
@@ -14,13 +13,22 @@
     <h3>{{ p.name }}</h3>
     <div class="price">₦{{ "{:,.2f}".format(p.price) }}</div>
     <div class="card-actions">
-      <button onclick="openColorModal({{ p.id }}, '{{ p.name }}')" class="btn">Add to cart</button>
-      <a href="{{ url_for('main.product', pid=p.id) }}" class="btn">Details</a>
+      <button class="btn" onclick="openColorModal({{ p.id }}, '{{ p.name }}')">Add to cart</button>
+      <a href="{{ url_for('main.product', pid=p.id) }}" class="btn" style="text-decoration:none">Details</a>
     </div>
   </article>
   {% endfor %}
-
 </section>
 
-{% endblock %}
+<!-- Color Modal -->
+<div id="color-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5);">
+  <div style="background:#fff; margin:100px auto; padding:20px; width:400px; border-radius:8px; position:relative;">
+    <h3 id="color-modal-title">Select Color</h3>
+    <input id="color-input" type="text" placeholder="Enter color name or hex (#000000)" style="width:100%; padding:6px; margin-bottom:10px;">
+    <div id="color-suggestions" style="display:flex; flex-wrap:wrap; margin-bottom:10px;"></div>
+    <button id="confirm-color-btn" class="btn">Add to Cart</button>
+    <button onclick="closeColorModal()" class="btn" style="background:#ccc; margin-left:10px;">Cancel</button>
+  </div>
+</div>
 
+{% endblock %}

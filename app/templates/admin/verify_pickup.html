@@ -1,0 +1,36 @@
+{% extends "admin/base.html" %}
+{% block content %}
+
+<div class="card">
+  <h3>Verify Pickup Code</h3>
+
+  <input type="text" id="pickup_code" placeholder="Enter pickup code" class="form-control">
+  <button onclick="verify()" class="btn btn-primary mt-2">Verify</button>
+
+  <div id="result" class="mt-3"></div>
+</div>
+
+<script>
+function verify() {
+  fetch("/verify-pickup", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      pickup_code: document.getElementById("pickup_code").value
+    })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      document.getElementById("result").innerHTML =
+        `<p><b>Status:</b> ${d.status}</p>
+         <p><b>Generated:</b> ${d.generated_at}</p>`;
+    } else {
+      document.getElementById("result").innerHTML =
+        `<p class="text-danger">${d.message}</p>`;
+    }
+  });
+}
+</script>
+
+{% endblock %}

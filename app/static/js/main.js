@@ -55,16 +55,39 @@ async function renderCart(){
     const text = document.createElement('span');
     text.textContent = `${it.name} x${it.qty} — ₦${(it.price * it.qty).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     li.appendChild(text);
+if(it.product_type){
+  const type = document.createElement('div');
+  type.style.fontSize = '12px';
+  type.style.opacity = '0.7';
+  type.textContent = `Type: ${it.product_type}`;
+  li.appendChild(type);
+}
 
     // Color swatch
-    if(it.color_hex){
-      const swatch = document.createElement('div');
-      swatch.style.width = '20px';
-      swatch.style.height = '20px';
-      swatch.style.backgroundColor = it.color_hex;
-      swatch.style.border = '1px solid #000';
-      li.appendChild(swatch);
-    }
+    // Color swatch + name
+// --- COLOR DISPLAY ---
+const colorWrapper = document.createElement('div');
+colorWrapper.style.display = 'flex';
+colorWrapper.style.alignItems = 'center';
+colorWrapper.style.gap = '6px';
+
+if(it.color_hex){
+  const swatch = document.createElement('div');
+  swatch.style.width = '16px';
+  swatch.style.height = '16px';
+  swatch.style.borderRadius = '4px';
+  swatch.style.backgroundColor = it.color_hex;
+  swatch.style.border = '1px solid #000';
+  colorWrapper.appendChild(swatch);
+}
+
+const cname = document.createElement('span');
+cname.textContent = it.color_name ? it.color_name : "No color selected";
+colorWrapper.appendChild(cname);
+
+li.appendChild(colorWrapper);
+
+
 
     // Delete button
     const del = document.createElement('button');
@@ -88,16 +111,29 @@ async function renderCart(){
     `Total: ₦${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
 }
 // --------------------- END RENDER CART ---------------------
+async function addToCart(pid, qty=1, color=null){
+  // color is optional, default null
+  const payload = {
+    product_id: pid,
+    qty: qty,
+    color_name: color ? color.name : null,
+    color_hex: color ? color.hex : null
+  };
 
-async function addToCart(pid, qty=1){
-  await fetch('/cart/add', {
-      method:'POST', 
-      headers:{'Content-Type':'application/json'}, 
-      body: JSON.stringify({product_id: pid, qty})
+  const res = await fetch('/cart/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
   });
-  updateCartCount();
-  showToast('Added to cart');
+
+  const data = await res.json();
+  if(data.status){
+    updateCartCount();
+    showToast('Added to cart');
+  }
 }
+
+
 
 function showToast(message) {
   const toast = document.getElementById('toast');
@@ -108,12 +144,94 @@ function showToast(message) {
 
 let selectedProductId = null;
 let selectedColor = null;
+let colorBank = [];
 
-// Open color modal when "Add to Cart" button clicked
+
+/* -----------------------------
+   LOAD COLORS ONCE
+----------------------------- */
+async function loadColors() {
+    if (colorBank.length) return;
+
+    for (let i = 0; i < 8; i++) {
+        try {
+            const res = await fetch(
+              `https://www.thecolorapi.com/scheme?count=100&mode=analogic&hex=${Math.floor(Math.random()*16777215).toString(16)}`
+            );
+            const data = await res.json();
+
+            data.colors.forEach(c => {
+                colorBank.push({
+                    name: c.name.value,
+                    hex: c.hex.value,
+                    img: c.image.bare
+                });
+            });
+        } catch {}
+    }
+}
+
+/* -----------------------------
+   OPEN COLOR MODAL
+----------------------------- */
+function openColorPicker(productId) {
+    selectedProductId = productId;
+    document.getElementById("colorModal").style.display = "block";
+    loadColors();
+}
+
+/* -----------------------------
+   SEARCH COLORS
+----------------------------- */
+function searchColors() {
+    const query = document.getElementById("colorSearch").value.toLowerCase();
+    const results = document.getElementById("colorResults");
+    results.innerHTML = "";
+
+    if (!query) return;
+
+    colorBank
+      .filter(c => c.name.toLowerCase().includes(query))
+      .slice(0, 30)
+      .forEach(color => {
+          const div = document.createElement("div");
+          div.className = "color-item";
+          div.innerHTML = `
+              <img src="${color.img}">
+              <span>${color.name}</span>
+          `;
+          div.onclick = () => selectColor(color);
+          results.appendChild(div);
+      });
+}
+
+/* -----------------------------
+   ADD TO CART (SINGLE SOURCE)
+----------------------------- */
+function selectColor(color){
+    if(!selectedProductId) return;
+    addToCart(selectedProductId, 1, color); // use the unified function
+    closeColorModal();
+}
+
+
+/* -----------------------------
+   CLOSE MODAL
+----------------------------- */
+function closeColorModal() {
+    document.getElementById("colorModal").style.display = "none";
+    document.getElementById("colorSearch").value = "";
+    document.getElementById("colorResults").innerHTML = "";
+}
+
+
+
+// ---- Replace only the color-input listener with this block ----
+// Open modal
 function openColorModal(productId, productName){
   selectedProductId = productId;
   selectedColor = null;
-  document.getElementById('color-product-name').textContent = productName;
+  document.getElementById('color-modal-title').textContent = productName;
   document.getElementById('color-input').value = '';
   document.getElementById('color-suggestions').innerHTML = '';
   document.getElementById('color-modal').style.display = 'block';
@@ -122,202 +240,168 @@ function openColorModal(productId, productName){
 // Close modal
 function closeColorModal(){
   document.getElementById('color-modal').style.display = 'none';
+  selectedProductId = null;
+  selectedColor = null;
 }
 
-// ---- Replace only the color-input listener with this block ----
-document.getElementById('color-input').addEventListener('input', async function () {
+// Color input listener
+document.getElementById('color-input').addEventListener('input', async function(){
   const raw = this.value.trim();
   const suggestionsDiv = document.getElementById('color-suggestions');
   suggestionsDiv.innerHTML = '';
   selectedColor = null;
 
-  if (!raw) return;
+  if(!raw) return;
 
-  // Normalize input (try with and without spaces)
   const candidates = [raw, raw.replace(/\s+/g, '')];
 
-  // Helper: test if the browser understands this color name
-  function browserColorToHex(name) {
+  function browserColorValid(nameOrHex){
     const test = document.createElement('div');
-    test.style.backgroundColor = '';              // reset
-    test.style.backgroundColor = name;
-    // If browser didn't accept it, the property stays empty string
-    if (!test.style.backgroundColor) return null;
-    // Use computed style to get rgb(...) and convert to hex
-    const cs = getComputedStyle(test).backgroundColor;
-    // cs like "rgb(255, 0, 0)" or "rgba(0,0,0,0)"
-    const m = cs.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-    if (!m) return null;
-    const r = parseInt(m[1], 10);
-    const g = parseInt(m[2], 10);
-    const b = parseInt(m[3], 10);
-    const toHex = n => ('0' + n.toString(16)).slice(-2);
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+    test.style.backgroundColor = '';
+    test.style.backgroundColor = nameOrHex;
+    return !!test.style.backgroundColor;
   }
 
-  // STEP 1: Try to resolve locally using the browser. This prevents showing black.
-  let mainHex = null;
-  let mainName = null;
-  for (const cand of candidates) {
-    const h = browserColorToHex(cand);
-    if (h) {
-      mainHex = h;
-      mainName = cand;
+  let mainColor=null, mainName=null, mainHex=null;
+
+  // STEP 1: Browser validation
+  for(const c of candidates){
+    if(browserColorValid(c)){
+      mainColor = c; mainName=c;
+      const div = document.createElement('div');
+      div.style.backgroundColor = c;
+      const cs = getComputedStyle(div).backgroundColor;
+      const m = cs.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      if(m){
+        const toHex = n=>('0'+n.toString(16)).slice(-2);
+        mainHex = `#${toHex(parseInt(m[1],10))}${toHex(parseInt(m[2],10))}${toHex(parseInt(m[3],10))}`.toUpperCase();
+      }
       break;
     }
   }
 
-  // If browser couldn't resolve name, still try API (it can sometimes understand names the browser doesn't).
-  if (!mainHex) {
-    try {
-      // Use scheme endpoint (accepts names or hex). We request just 1 color to get a main match.
-      const apiRes = await fetch(`https://www.thecolorapi.com/scheme?hex=${encodeURIComponent(raw)}&mode=monochrome&count=1`);
-      if (apiRes.ok) {
-        const apiData = await apiRes.json();
-        if (apiData && Array.isArray(apiData.colors) && apiData.colors.length > 0) {
-          mainHex = apiData.colors[0].hex.value;
-          mainName = apiData.colors[0].name ? apiData.colors[0].name.value : raw;
+  // STEP 2: API fallback
+  if(!mainColor){
+    try{
+      const res = await fetch(`https://www.thecolorapi.com/scheme?hex=${encodeURIComponent(raw.replace('#',''))}&mode=monochrome&count=1`);
+      if(res.ok){
+        const data = await res.json();
+        if(data?.colors?.length){
+          mainHex = data.colors[0].hex?.value || '#CCCCCC';
+          mainName = data.colors[0].name?.value || raw;
+          mainColor = browserColorValid(mainName) ? mainName : mainHex;
         }
       }
-    } catch (err) {
-      // swallow — we'll fallback to a visible placeholder
-      console.warn('API attempt failed (will fallback to browser-only):', err);
-    }
+    }catch{}
   }
 
-  // Final fallback: if we still have no color, show the typed text as preview (avoids black)
-  if (!mainHex) {
-    // Try to remove spaces/hyphens and try browser again
-    const alt = raw.replace(/[\s-]+/g, '');
-    const h = browserColorToHex(alt);
-    if (h) {
-      mainHex = h;
-      mainName = alt;
-    } else {
-      // show a neutral "unknown" swatch and text, don't select any color
-      const unknown = document.createElement('div');
-      unknown.textContent = `Unknown color: ${raw}`;
-      unknown.style.padding = '8px';
-      unknown.style.color = '#333';
-      suggestionsDiv.appendChild(unknown);
-      return;
-    }
+  // STEP 3: fallback
+  if(!mainColor){
+    mainColor = '#CCCCCC';
+    mainHex = '#CCCCCC';
+    mainName = raw;
   }
 
-  // STEP 2: Show the main swatch (guaranteed valid hex now)
-  const mainSwatch = document.createElement('div');
-  mainSwatch.style.display = 'inline-block';
-  mainSwatch.style.margin = '4px';
-  mainSwatch.style.width = '40px';
-  mainSwatch.style.height = '40px';
-  mainSwatch.style.borderRadius = '6px';
-  mainSwatch.style.border = '2px solid #ccc';
-  mainSwatch.style.cursor = 'pointer';
-  mainSwatch.style.backgroundColor = mainHex || raw;
-  mainSwatch.title = `${mainName || raw} — ${mainHex}`;
-
-  // label below swatch
+  // STEP 4: render main swatch
   const wrapper = document.createElement('div');
   wrapper.style.display = 'inline-block';
-  wrapper.style.textAlign = 'center';
-  wrapper.style.fontSize = '12px';
-  wrapper.style.marginRight = '6px';
-  wrapper.appendChild(mainSwatch);
-  const label = document.createElement('div');
-  label.textContent = (mainName || raw) + `\n${mainHex}`;
-  label.style.whiteSpace = 'pre';
-  wrapper.appendChild(label);
+  wrapper.style.margin='4px';
+  wrapper.style.textAlign='center';
+  wrapper.style.fontSize='12px';
 
-  mainSwatch.addEventListener('click', () => {
-    document.querySelectorAll('#color-suggestions div').forEach(d => d.style.border = '2px solid #ccc');
-    mainSwatch.style.border = '2px solid black';
-    selectedColor = { name: mainName || raw, hex: mainHex };
+  const sw = document.createElement('div');
+  sw.style.width='40px';
+  sw.style.height='40px';
+  sw.style.borderRadius='6px';
+  sw.style.border='2px solid #ccc';
+  sw.style.cursor='pointer';
+  sw.style.backgroundColor=mainColor;
+  sw.title=`${mainName} — ${mainHex}`;
+  sw.addEventListener('click', ()=>{
+    document.querySelectorAll('#color-suggestions div > div').forEach(d=>d.style.border='2px solid #ccc');
+    sw.style.border='2px solid black';
+    selectedColor={name:mainName, hex:mainHex};
   });
 
+  const lbl = document.createElement('div');
+  lbl.style.whiteSpace='pre';
+  lbl.textContent=`${mainName}\n${mainHex}`;
+
+  wrapper.appendChild(sw);
+  wrapper.appendChild(lbl);
   suggestionsDiv.appendChild(wrapper);
 
-  // STEP 3: Attempt to fetch related colors (analogous). If API fails, nothing else breaks.
-  try {
-    const schemeRes = await fetch(`https://www.thecolorapi.com/scheme?hex=${encodeURIComponent(mainHex.replace('#',''))}&mode=analogic&count=5`);
-    if (schemeRes.ok) {
+  // STEP 5: related colors (analogous)
+  try{
+    const schemeRes = await fetch(`https://www.thecolorapi.com/scheme?hex=${mainHex.replace('#','')}&mode=analogic&count=5`);
+    if(schemeRes.ok){
       const schemeData = await schemeRes.json();
-      if (schemeData && Array.isArray(schemeData.colors)) {
-        schemeData.colors.forEach(c => {
-          const chex = c.hex && c.hex.value ? c.hex.value : null;
-          const cname = c.name && c.name.value ? c.name.value : chex;
-          if (!chex) return;
+      schemeData.colors?.forEach(c=>{
+        const chex=c.hex?.value;
+        const cname=c.name?.value||chex;
+        if(!chex) return;
 
-          const sw = document.createElement('div');
-          sw.style.display = 'inline-block';
-          sw.style.margin = '4px';
-          sw.style.width = '36px';
-          sw.style.height = '36px';
-          sw.style.borderRadius = '6px';
-          sw.style.border = '2px solid #ccc';
-          sw.style.cursor = 'pointer';
-          sw.style.backgroundColor = chex;
-          sw.title = `${cname} — ${chex}`;
+        const wrap = document.createElement('div');
+        wrap.style.display='inline-block';
+        wrap.style.textAlign='center';
+        wrap.style.fontSize='11px';
+        wrap.style.marginRight='6px';
 
-          const wrap = document.createElement('div');
-          wrap.style.display = 'inline-block';
-          wrap.style.textAlign = 'center';
-          wrap.style.fontSize = '11px';
-          wrap.style.marginRight = '6px';
-          wrap.appendChild(sw);
-          const lbl = document.createElement('div');
-          lbl.textContent = cname + `\n${chex}`;
-          lbl.style.whiteSpace = 'pre';
-          wrap.appendChild(lbl);
-
-          sw.addEventListener('click', () => {
-            document.querySelectorAll('#color-suggestions div').forEach(d => d.style.border = '2px solid #ccc');
-            sw.style.border = '2px solid black';
-            selectedColor = { name: cname, hex: chex };
-          });
-
-          suggestionsDiv.appendChild(wrap);
+        const sw2 = document.createElement('div');
+        sw2.style.width='36px';
+        sw2.style.height='36px';
+        sw2.style.borderRadius='6px';
+        sw2.style.border='2px solid #ccc';
+        sw2.style.cursor='pointer';
+        sw2.style.backgroundColor=browserColorValid(cname)?cname:chex;
+        sw2.title=`${cname} — ${chex}`;
+        sw2.addEventListener('click', ()=>{
+          document.querySelectorAll('#color-suggestions div > div').forEach(d=>d.style.border='2px solid #ccc');
+          sw2.style.border='2px solid black';
+          selectedColor={name:cname, hex:chex};
         });
-      }
-    } else {
-      console.warn('Related colors fetch returned status', schemeRes.status);
+
+        const lbl2 = document.createElement('div');
+        lbl2.style.whiteSpace='pre';
+        lbl2.textContent=`${cname}\n${chex}`;
+
+        wrap.appendChild(sw2);
+        wrap.appendChild(lbl2);
+        suggestionsDiv.appendChild(wrap);
+      });
     }
-  } catch (err) {
-    console.warn('Related colors fetch failed:', err);
-    // don't show error to user — main color already displayed
-  }
+  }catch{}
 });
-// ---- end listener ----
 
-
-
-// Confirm color and add product to cart
-document.getElementById('confirm-color-btn').addEventListener('click', async ()=>{
-  if(!selectedProductId || !selectedColor){
+// Confirm and add to cart
+document.getElementById('confirm-color-btn').addEventListener('click', async () => {
+  if (!selectedProductId || !selectedColor) {
     alert('Please select a color.');
     return;
   }
 
-  // Send product + color info to /cart/add
-  await fetch('/cart/add', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      product_id: selectedProductId,
-      qty: 1,
-      color_name: selectedColor.name,
-      color_hex: selectedColor.hex
-    })
-  });
+  try {
+    // Call the unified function
+    await addToCart(selectedProductId, 1, selectedColor);
 
-  updateCartCount();
-  closeColorModal();
-  showToast('Added to cart with selected color');
+    // Close the color modal
+    closeColorModal();
+
+    // Show toast
+    if (typeof showToast === 'function') showToast('Added to cart with selected color');
+  } catch (err) {
+    console.error(err);
+    alert('Error adding product to cart.');
+  }
 });
 
-// Checkout redirect to server checkout route
-function proceedToCheckout(){ 
-  window.location.href = '/checkout'; 
+
+// Checkout button
+function proceedToCheckout(){
+  window.location.href='/checkout';
 }
+
+
 
 // Rating widget on product page
 document.addEventListener('DOMContentLoaded', function(){
@@ -402,43 +486,47 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 
 
-(function() {
-  let currentScroll = 0;  // current position
-  let targetScroll = 0;   // desired position
+(function () {
 
-  const ease = 0.02;      // very slow easing for water-like motion
-  const maxDelta = 30;    // max scroll change per wheel/touch for gentle drip
+  // 🚫 Mobile: do NOTHING (use native scroll)
+  if (window.matchMedia("(max-width: 768px)").matches) {
+    return;
+  }
 
-  // Wheel / Trackpad
-  window.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    targetScroll += Math.max(-maxDelta, Math.min(maxDelta, e.deltaY));
-    targetScroll = Math.max(0, Math.min(targetScroll, document.body.scrollHeight - window.innerHeight));
-  }, { passive: false });
+  // 🖥 Desktop only from here
+  let currentScroll = window.scrollY;
+  let targetScroll = window.scrollY;
 
-  // Touch devices
-  let touchStartY = 0;
-  window.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
-  }, { passive: true });
+  const ease = 0.06;     // faster than 0.02 (less lag)
+  const maxDelta = 120;  // allow natural wheel movement
 
-  window.addEventListener('touchmove', (e) => {
-    const delta = touchStartY - e.touches[0].clientY;
-    targetScroll += Math.max(-maxDelta, Math.min(maxDelta, delta));
-    targetScroll = Math.max(0, Math.min(targetScroll, document.body.scrollHeight - window.innerHeight));
-    touchStartY = e.touches[0].clientY;
-  }, { passive: true });
+  // Wheel / Trackpad (desktop)
+  window.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
 
-  // Animation loop
+      targetScroll += e.deltaY;
+      targetScroll = Math.max(
+        0,
+        Math.min(
+          targetScroll,
+          document.documentElement.scrollHeight - window.innerHeight
+        )
+      );
+    },
+    { passive: false }
+  );
+
   function animateScroll() {
-    const distance = targetScroll - currentScroll;
-    currentScroll += distance * ease; // interpolate slowly for water-like motion
+    currentScroll += (targetScroll - currentScroll) * ease;
     window.scrollTo(0, currentScroll);
     requestAnimationFrame(animateScroll);
   }
 
   animateScroll();
 })();
+
 
 
 let stream = null;
@@ -646,3 +734,26 @@ stateSelect.addEventListener("change", () => {
   }
 });
 
+
+async function verifyPickup(code, btn) {
+    try {
+        const res = await fetch('/verify-pickup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pickup_code: code })
+        });
+        const data = await res.json();
+        alert(data.message);
+
+        if (data.success) {
+            // optionally update the row to show Delivered
+            const row = btn.closest('tr');
+            row.querySelector('.delivered-status').textContent = 'Yes';
+            btn.disabled = true;
+            btn.textContent = 'Verified';
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error verifying pickup code');
+    }
+}

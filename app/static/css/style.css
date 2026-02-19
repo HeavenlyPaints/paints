@@ -572,3 +572,38 @@ form textarea:focus {
     background:#b11226;
 }
 
+video {
+  width: 200px;          /* set your size */
+  height: 200px;         /* same as width */
+  border-radius: 50%;    /* makes it circular */
+  object-fit: cover;     /* fills the circle without distortion */
+  display: none;         /* keep hidden until camera starts */
+  border: 4px groove  var(--accent);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+
+#color-suggestions {
+  max-height: 200px;        /* adjust height as needed */
+  overflow-y: auto;         /* vertical scroll */
+  padding: 4px;
+  margin-top: 8px;
+  border-top: 1px solid #ccc; /* optional: visual separation */
+  display: flex;
+  flex-wrap: wrap;          /* keep swatches in rows */
+  gap: 6px;
+}
+
+/* Optional: scrollbar styling for Webkit (Chrome, Safari) */
+#color-suggestions::-webkit-scrollbar {
+  width: 6px;
+}
+
+#color-suggestions::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0.3);
+  border-radius: 3px;
+}
+
+#color-suggestions::-webkit-scrollbar-track {
+  background: transparent;
+}

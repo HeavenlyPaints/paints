@@ -5,6 +5,8 @@ from . import mail
 from flask_mailman import EmailMessage
 from werkzeug.utils import secure_filename
 import uuid
+import random, string
+from datetime import datetime
 
 def send_email(subject, recipients, html_body, text_body=None):
     if not current_app.config.get("MAIL_USERNAME"):
@@ -18,29 +20,37 @@ def send_email(subject, recipients, html_body, text_body=None):
         current_app.logger.error("Failed to send email: %s", e)
         return False
 
-def initialize_paystack(reference, email, amount, callback_url):
+def initialize_paystack(reference, email, amount, callback):
     url = "https://api.paystack.co/transaction/initialize"
+
     headers = {
-        "Authorization": f"Bearer {current_app.config['PAYSTACK_SECRET']}",
+        "Authorization": f"Bearer {current_app.config['PAYSTACK_SECRET_KEY']}",
         "Content-Type": "application/json"
     }
+
     data = {
         "reference": reference,
-        "amount": amount,
         "email": email,
-        "callback_url": callback_url
+        "amount": amount,
+        "callback_url": callback
     }
+
     r = requests.post(url, json=data, headers=headers, timeout=20)
+
+    print("STATUS CODE:", r.status_code)
+    print("RESPONSE TEXT:", r.text)
+
     return r.json()
+
 
 def verify_paystack_transaction(reference):
     url = f"https://api.paystack.co/transaction/verify/{reference}"
-    headers = {"Authorization": f"Bearer {current_app.config['PAYSTACK_SECRET']}"}
+    headers = {"Authorization": f"Bearer {current_app.config['PAYSTACK_SECRET_KEY']}"}
     r = requests.get(url, headers=headers, timeout=20)
     return r.json()
 
 def validate_paystack_webhook(request):
-    secret = current_app.config.get('PAYSTACK_SECRET') or ''
+    secret = current_app.config.get('PAYSTACK_SECRET_KEY') or ''
     signature = request.headers.get('x-paystack-signature', '')
     body = request.get_data()
     computed = hmac.new(secret.encode(), body, hashlib.sha512).hexdigest()
@@ -90,3 +100,7 @@ def save_multiple_files(files, folder="documents"):
             saved_files.append(f"{folder}/{new_name}")
 
     return ",".join(saved_files)
+
+
+def generate_pickup_code():
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))

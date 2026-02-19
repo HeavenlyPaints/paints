@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Retrieve Pickup Code</h2>
+
+<input id="reference" placeholder="Order Reference" class="form-control">
+<input id="email" placeholder="Email used during checkout" class="form-control mt-2">
+
+<button onclick="resend()" class="btn btn-primary mt-3">
+  Send Pickup Code
+</button>
+
+<script>
+function resend() {
+  fetch("/resend-pickup-code", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      reference: document.getElementById("reference").value,
+      email: document.getElementById("email").value
+    })
+  })
+  .then(r => r.json())
+  .then(d => alert(d.message));
+}
+</script>
+
+{% endblock %}

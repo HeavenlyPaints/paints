@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+
 {% block content %}
-
 <div style="text-align:center; margin-top:50px;">
-    <h2>Your account is awaiting admin approval</h2>
-    <p>Please check back later.</p>
+    <h2>Hello {{ referer.name }} 👋</h2>
+    <p>Your account is currently <strong>awaiting admin approval</strong>.</p>
+    <p>We’ll notify you once your application is approved.</p>
+    <p>Meanwhile, you can relax and check back later. Thank you for applying!</p>
 </div>
-
 {% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Order Details: {{ order.reference }}</h2>
+
+<p><strong>Customer:</strong> {{ order.name }} ({{ order.email }})</p>
+<p><strong>Phone:</strong> {{ order.phone }}</p>
+<p><strong>Amount:</strong> ₦{{ "{:,.2f}".format(order.amount) }}</p>
+<p><strong>Paid:</strong> {{ 'Yes' if order.paid else 'No' }}</p>
+<p><strong>Delivered:</strong> {{ 'Yes' if order.delivered else 'No' }}</p>
+<p><strong>Terminated:</strong> {{ 'Yes' if order.terminated else 'No' }}</p>
+
+<h3>Items</h3>
+<ul>
+  {% for item in items %}
+    <li>{{ item.product.name }} - Qty: {{ item.quantity }}</li>
+  {% endfor %}
+</ul>
+
+<a href="{{ url_for('main.admin_orders') }}">Back to all orders</a>
+{% endblock %}

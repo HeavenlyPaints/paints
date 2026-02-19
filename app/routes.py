@@ -1,4 +1,10 @@
 import uuid
+from functools import wraps
+import random
+import string
+import requests
+from .utils import generate_pickup_code
+import secrets
 from jinja2 import TemplateNotFound
 from flask import render_template, session, abort
 from flask_login import logout_user, login_required
@@ -6,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from flask import send_file, abort, current_app
 import io
 import os
+from .models import OrderItem
 from app.models import Bank
 import zipfile
 from io import BytesIO
@@ -67,6 +74,24 @@ def index():
     )
 
 
+def staff_required(role=None):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            staff_id = session.get('staff_id')
+            if not staff_id:
+                flash("Please log in first.", "warning")
+                return redirect(url_for('main.staff_login'))
+            staff = Staff.query.get(staff_id)
+            if not staff:
+                flash("Staff not found.", "danger")
+                return redirect(url_for('main.staff_login'))
+            if role and staff.role.lower() != role.lower():
+                flash("Access denied.", "danger")
+                return redirect(url_for('main.staff_dashboard'))
+            return f(*args, staff=staff, **kwargs)
+        return wrapper
+    return decorator
 
 @bp.route("/product/<int:pid>")
 def product(pid):
@@ -143,13 +168,14 @@ def cart_add():
     cart = _get_cart()
 
     cart.append({
-        "product_id": pid,
-        "name": p.name,
-        "price": p.price,
-        "qty": qty,
-        "color_name": color_name,
-        "color_hex": color_hex
-    })
+    "product_id": pid,
+    "name": p.name,
+    "price": p.price,
+    "qty": qty,
+    "color_name": color_name,
+    "color_hex": color_hex
+})
+
 
     _save_cart(cart)
     return jsonify({"status": True, "cart": cart})
@@ -182,28 +208,53 @@ def cart_view():
     return jsonify({"cart": _get_cart()})
 
 
-@bp.route("/checkout", methods=["GET","POST"])
+@bp.route("/checkout", methods=["GET", "POST"])
 def checkout():
     form = CheckoutForm()
     cart = _get_cart()
+
     if not cart:
         flash("Cart is empty", "warning")
         return redirect(url_for("main.index"))
-    amount = sum([it['price'] * it['qty'] for it in cart])
-    amount_kobo = amount*100
+
+    amount = sum(it["price"] * it["qty"] for it in cart)
+    amount_kobo = int(amount * 100)
+
     if form.validate_on_submit():
         reference = uuid.uuid4().hex
-        order = Order(reference=reference, name=form.name.data, email=form.email.data, phone=form.phone.data, items=json.dumps(cart), amount=amount)
-        db.session.add(order); db.session.commit()
+
+        ref_token = session.get("ref_token")
+
+        order = Order(
+            reference=reference,
+            name=form.name.data,
+            email=form.email.data,
+            phone=form.phone.data,
+            amount=amount,
+            ref_token=ref_token
+        )
+        db.session.add(order)
+        db.session.commit()
+
         callback = url_for("main.paystack_callback", _external=True)
-        init = initialize_paystack(reference, order.email, amount_kobo, callback)
-        if init.get("status"):
-            session.pop('cart', None)
-            return redirect(init["data"]["authorization_url"])
-        else:
-            flash("Payment initialization failed", "danger")
+
+        try:
+            init = initialize_paystack(reference, order.email, amount_kobo, callback)
+        except requests.exceptions.ReadTimeout:
+            flash("Payment service is slow. Please try again.", "danger")
             return redirect(url_for("main.checkout"))
+        except requests.exceptions.RequestException:
+            flash("Unable to connect to payment service.", "danger")
+            return redirect(url_for("main.checkout"))
+
+        if not init or not init.get("status"):
+            flash("Payment initialization failed.", "danger")
+            return redirect(url_for("main.checkout"))
+
+        return redirect(init["data"]["authorization_url"])
+
     return render_template("checkout.html", form=form, cart=cart, amount=amount)
+
 
 @bp.route("/paystack/callback")
 def paystack_callback():
@@ -211,35 +262,83 @@ def paystack_callback():
     if not reference:
         flash("Invalid payment callback", "danger")
         return redirect(url_for("main.index"))
-    res = verify_paystack_transaction(reference)
-    if res.get("status") and res["data"]["status"] == "success":
-        order = Order.query.filter_by(reference=reference).first()
-        if order:
-            order.paid = True
+
+    try:
+        res = verify_paystack_transaction(reference)
+    except Exception:
+        flash("Payment verification failed. Try again.", "danger")
+        return redirect(url_for("main.index"))
+
+    if not (res.get("status") and res["data"]["status"] == "success"):
+        flash("Payment verification failed", "danger")
+        return redirect(url_for("main.index"))
+
+    order = Order.query.filter_by(reference=reference).first()
+    if not order:
+        flash("Order not found", "danger")
+        return redirect(url_for("main.index"))
+
+    order.paid = True
+
+    if not order.pickup_code:
+        order.pickup_code = generate_pickup_code()
+        order.pickup_generated_at = datetime.utcnow()
+
+    cart = session.get("cart", [])
+
+    for item in cart:
+        product = Product.query.get(item["product_id"])
+
+        if product:
+            product.sold += item["qty"]
+
+            order_item = OrderItem(
+                order_id=order.id,
+                product_id=product.id,
+                quantity=item["qty"]
+            )
+
+            db.session.add(order_item)
+
+    session["cart"] = []
+
+
+    if order.ref_token:
+        referrer = Referer.query.filter_by(token=order.ref_token, status="approved").first()
+        if referrer:
+            earn = int(order.amount * 0.09)
+            referrer.earnings += earn
+            referrer.referrals_count += 1
             db.session.commit()
-            items = json.loads(order.items)
-            for it in items:
-                p = Product.query.get(it['product_id'])
-                if p:
-                    p.sold += it['qty']
-            db.session.commit()
-            token = session.get('ref_token')
-            if token:
-                r = Referer.query.filter_by(token=token, approved=True).first()
-                if r:
-                    earn = int(order.amount * 0.09)
-                    r.earnings += earn
-                    r.referrals_count += 1
-                    db.session.commit()
-                    badge, pct = badge_for_count(r.referrals_count)
-                    if badge:
-                        send_email("Badge achieved", [r.email or current_app.config.get('MAIL_USERNAME')], f"<p>Congrats {r.name}, you earned {badge} badge ({pct}%)</p>")
-            send_email("Order successful", [order.email], f"<p>Payment for order {order.reference} successful.</p>")
-            send_email("New order received", [current_app.config.get("MAIL_USERNAME")], f"<p>Order {order.reference} placed.</p>")
-            flash("Payment confirmed. Order placed.", "success")
-            return redirect(url_for("main.index"))
-    flash("Payment verification failed", "danger")
-    return redirect(url_for("main.index"))
+            badge, pct = badge_for_count(referrer.referrals_count)
+            if badge:
+                send_email(
+                    "Badge achieved",
+                    [referrer.email or current_app.config.get('MAIL_USERNAME')],
+                    f"<p>Congrats {referrer.name}, you earned {badge} badge ({pct}%)</p>"
+                )
+
+    db.session.commit()
+
+    send_email(
+        "Order successful",
+        [order.email],
+        f"""
+        <p>Payment for order <b>{order.reference}</b> successful.</p>
+        <p><b>Your pickup code:</b> {order.pickup_code}</p>
+        <p>Please present this code when picking up your product.</p>
+        """
+    )
+
+    send_email(
+        "New order received",
+        [current_app.config.get("MAIL_USERNAME")],
+        f"<p>Order {order.reference} placed.</p>"
+    )
+
+    flash("Payment confirmed. Order placed.", "success")
+    return render_template("payment_confirmation.html", order=order)
+
 
 @bp.route("/webhook/paystack", methods=["POST"])
 def paystack_webhook():
@@ -256,53 +355,65 @@ def paystack_webhook():
     return jsonify({"status": True}), 200
 
 
+def generate_pickup_code(length=7):
+    """Generate a unique alphanumeric pickup code"""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
 
 @bp.route('/apply-referer', methods=['GET', 'POST'])
 def apply_referer():
     if request.method == "POST":
         full_name = request.form.get("full_name")
         whatsapp = request.form.get("whatsapp_number")
+        bank_name = request.form.get("bank")
         account_number = request.form.get("account_number")
         account_name = request.form.get("account_name")
-        bank_name = request.form.get("bank")  # matches <select name="bank">
-
         existing = Referer.query.filter_by(whatsapp=whatsapp).first()
         if existing:
             flash("You have already applied.", "warning")
             return redirect(url_for("main.referer_login"))
 
+        bank = Bank.query.filter_by(name=bank_name).first()
+        # generate a unique token for this referer
+        token = uuid.uuid4().hex
+
         r = Referer(
             name=full_name,
             whatsapp=whatsapp,
-            bank_code=bank_name,  # store the selected bank
+            bank_id=bank.id if bank else None,
+            bank_name=bank_name,
             account_number=account_number,
             account_name=account_name,
             status="pending",
             earnings=0,
-            referrals_count=0
+            referrals_count=0,
+            token=token
         )
-
         db.session.add(r)
         db.session.commit()
 
         send_email(
             "New Referer Application",
             [current_app.config["MAIL_USERNAME"]],
-            f"<h3>New Referer Application</h3>" 
+            f"<h3>New Referer Application</h3>"
             f"<p>{r.name} ({r.whatsapp}) applied.</p>"
         )
 
-        flash("Application submitted successfully.", "info")
-        return redirect(url_for("main.index"))
+        # redirect to pending page immediately
+        return redirect(url_for("main.referer_pending", token=r.token))
 
     return render_template("apply_referer.html")
 
 
+
+
+
 @bp.route("/generate_link/<token>")
 def generate_link(token):
-    r = Referer.query.filter_by(token=token, approved=True).first_or_404()
+    r = Referer.query.filter_by(token=token, status="approved").first_or_404()
     link = f"{url_for('main.index', _external=True)}?ref={r.token}"
     return jsonify({"status": True, "link": link})
+
 
 
 @bp.before_app_request
@@ -322,7 +433,11 @@ def referer_withdraw():
     if not all([token, amount, account]):
         return jsonify({"status": False, "message": "All fields are required"}), 400
 
-    r = Referer.query.filter_by(token=token, approved=True).first_or_404()
+
+    if amount < 20000:
+        return jsonify({"status": False, "message": "Minimum withdrawal is ₦2,000"}), 400
+
+    r = Referer.query.filter_by(token=token, status="approved").first_or_404()
 
     if amount > r.earnings:
         return jsonify({"status": False, "message": "Insufficient balance"}), 400
@@ -347,32 +462,55 @@ def referer_withdraw():
     return jsonify({"status": True, "message": "Withdrawal submitted"})
 
 
+@bp.route('/referer/pending/<token>')
+def referer_pending(token):
+    referer = Referer.query.filter_by(token=token).first_or_404()
+    return render_template("referer_pending.html", referer=referer)
+
 
 @bp.route("/referer/<token>/dashboard")
 def referer_dashboard(token):
-    # fetch referer
-    r = Referer.query.filter_by(token=token).first_or_404()
+    referer = Referer.query.filter_by(token=token).first_or_404()
 
-    # ✅ SECURITY CHECK: only the logged-in referer can view their dashboard
-    if session.get("referer_id") != r.id:
-        abort(403)
+    if referer.status != "approved":
+        return redirect(url_for("main.referer_pending", token=referer.token))
 
-    badge, pct = badge_for_count(r.referrals_count)
+    badge, pct = badge_for_count(referer.referrals_count)
+
+    total_withdrawn = db.session.query(func.sum(Withdrawal.amount))\
+        .filter_by(referer_id=referer.id, status="paid").scalar() or 0
+
+    pending_withdraw = db.session.query(func.sum(Withdrawal.amount))\
+        .filter_by(referer_id=referer.id, status="pending").scalar() or 0
+
+    start_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    monthly_withdrawn = db.session.query(func.sum(Withdrawal.amount))\
+        .filter(
+            Withdrawal.referer_id == referer.id,
+            Withdrawal.created_at >= start_month
+        ).scalar() or 0
 
     return render_template(
         "referer/dashboard.html",
-        referrer=r,
+        referrer=referer,
         badge=badge,
         pct=pct,
-        monthly_earnings=r.earnings
+        monthly_earnings=referer.earnings,
+        total_withdrawn=total_withdrawn,
+        pending_withdraw=pending_withdraw,
+        monthly_withdrawn=monthly_withdrawn
     )
+
+
+
 
 
 @bp.route("/referer-login", methods=["GET", "POST"])
 def referer_login():
     if request.method == "POST":
-        whatsapp = request.form.get("whatsapp")
-
+        whatsapp = request.form.get("whatsapp_number", "")
+        whatsapp = whatsapp.replace(" ", "").replace("+", "").strip()
         referer = Referer.query.filter_by(whatsapp=whatsapp).first()
 
         if not referer:
@@ -380,19 +518,17 @@ def referer_login():
             return redirect(url_for("main.referer_login"))
 
         if referer.status == "pending":
-            flash("Your application is under review.", "warning")
-            return redirect(url_for("main.referer_login"))
-
-        if referer.status == "rejected":
+            return redirect(url_for("main.referer_pending", token=referer.token))
+        elif referer.status == "rejected":
             flash("Your application was rejected.", "danger")
             return redirect(url_for("main.referer_login"))
 
-        if referer.status == "approved":
-            session["referer_id"] = referer.id
-            session["referer_token"] = referer.token
-            return redirect(url_for("main.referer_dashboard", token=referer.token))
+        # approved referers go to dashboard
+        return redirect(url_for("main.referer_dashboard", token=referer.token))
 
     return render_template("referer_login.html")
+
+
 
 
 @bp.route("/referer-logout")
@@ -402,23 +538,144 @@ def referer_logout():
     return redirect(url_for("main.index"))
 
 
-@bp.route("/admin/approve_referer/<int:id>")
-def approve_referer(id):
-    r = Referer.query.get_or_404(id)
-    r.status = "approved"
+
+@bp.route("/admin/referer/<int:id>/approve", methods=["POST"])
+@login_required
+def admin_approve_referer(id):
+    referer = Referer.query.get_or_404(id)
+    referer.status = "approved"
     db.session.commit()
+    flash(f"{referer.name} approved.", "success")
+    return redirect(url_for("main.referer_requests"))
 
-    msg = f"🎉 Congratulations {r.name}! Your referral application has been approved. You can login to your account to start sharing your link to earn rewards!."
-    send_whatsapp_message(r.whatsapp, msg)
 
-    send_email(
-        "Referer Approved",
-        [current_app.config.get("MAIL_USERNAME")],
-        f"<p>{r.name} ({r.whatsapp}) has been approved as a referer.</p>"
+
+
+
+@bp.route("/admin/verify-pickup", methods=["POST"])
+@login_required
+def admin_verify_pickup():
+    data = request.get_json()
+    code = data.get("pickup_code")
+
+    if not code:
+        return jsonify(success=False, message="Pickup code required")
+
+    order = Order.query.filter_by(pickup_code=code).first()
+
+    if not order:
+        return jsonify(success=False, message="Invalid pickup code")
+
+    if not order.paid:
+        return jsonify(success=False, message="Order not paid")
+
+    if order.pickup_expired:
+        return jsonify(success=False, message="Pickup code expired")
+
+    items_data = []
+
+    for item in order.order_items:
+        items_data.append({
+            "item_id": item.id,
+            "product_name": item.product.name,
+            "ordered_quantity": item.quantity,
+            "collected_quantity": item.collected_quantity,
+            "remaining_quantity": item.remaining_quantity
+        })
+
+    # **Automatically mark delivered if all items collected**
+    if order.is_fully_collected:
+        order.delivered = True
+        order.pickup_expired = True
+        db.session.commit()
+
+    return jsonify(
+        success=True,
+        order_id=order.id,
+        customer=order.name,
+        items=items_data,
+        delivered=order.delivered
     )
 
-    flash(f"{r.name} has been approved and notified via WhatsApp.", "success")
-    return redirect(url_for("admin.manage_referers"))
+
+@bp.route("/admin/collect-items", methods=["POST"])
+@login_required
+def collect_items():
+
+    data = request.get_json()
+
+    order_id = data.get("order_id")
+    updates = data.get("updates")  
+    # Expected format:
+    # updates = [
+    #   {"item_id": 1, "collect_qty": 2},
+    #   {"item_id": 2, "collect_qty": 1}
+    # ]
+
+    order = Order.query.get(order_id)
+
+    if not order:
+        return jsonify(success=False, message="Order not found")
+
+    if order.pickup_expired or order.shifted:
+        return jsonify(success=False, message="Pickup not allowed")
+
+    for update in updates:
+
+        item = OrderItem.query.get(update["item_id"])
+
+        if not item:
+            continue
+
+        collect_qty = int(update["collect_qty"])
+
+        if collect_qty <= 0:
+            continue
+
+        if collect_qty > item.remaining_quantity:
+            return jsonify(
+                success=False,
+                message=f"Cannot collect more than remaining for {item.product.name}"
+            )
+
+        item.collected_quantity += collect_qty
+        item.product.delivered += collect_qty
+
+    # After updating items, check if fully collected
+    if order.is_fully_collected:
+        order.delivered = True
+        order.pickup_expired = True
+
+    db.session.commit()
+
+    return jsonify(
+        success=True,
+        message="Items collected successfully",
+        fully_collected=order.is_fully_collected
+    )
+
+
+
+
+@bp.route("/staff/verify-pickup")
+@login_required
+def verify_pickup_page():
+    return render_template("staff/sales/verify_pickup.html")
+
+
+
+
+
+@bp.route("/admin/referer/<int:id>/reject", methods=["POST"])
+@login_required
+def admin_reject_referer(id):
+    referer = Referer.query.get_or_404(id)
+    referer.status = "rejected"
+    db.session.commit()
+    flash(f"{referer.name} rejected.", "danger")
+    return redirect(url_for("main.referer_requests"))
+
+
 
 
 @bp.route("/admin/login", methods=["GET", "POST"])
@@ -426,17 +683,17 @@ def admin_login():
     form = AdminLoginForm()
 
     if form.validate_on_submit():
-        a = Admin.query.filter_by(username=form.username.data).first()
+        admin = Admin.query.filter_by(username=form.username.data).first()
 
-        if not a:
-            flash("Admin user not found", "danger")
-        elif not a.check_password(form.password.data):
-            flash("Wrong password", "danger")
-        else:
-            login_user(a)
+        if admin and admin.check_password(form.password.data):
+            login_user(admin)
             return redirect(url_for("main.admin_dashboard"))
+        else:
+            flash("Invalid username or password", "danger")
+            return redirect(url_for("main.admin_login"))  # ✅ redirect triggers one-time flash
 
     return render_template("admin/login.html", form=form)
+
 
 
 
@@ -456,25 +713,30 @@ def add_no_cache_headers(response):
     return response
 
 
+
 @bp.route("/admin/dashboard")
 @login_required
 def admin_dashboard():
+    # Only admin can access
     if current_user.username != 'admin':
         flash("Access denied!", "danger")
         return redirect(url_for('main.index'))
 
+    # Fetch products
     products = Product.query.all()
 
+    # Fetch referrers by status
     pending_referers = Referer.query.filter_by(status="pending").all()
     approved_referers = Referer.query.filter_by(status="approved").all()
     rejected_referers = Referer.query.filter_by(status="rejected").all()
 
+    # Fetch all orders (recent first)
+    orders = Order.query.order_by(Order.created_at.desc()).all()
+
+    # Monthly earnings calculation
     now = datetime.utcnow()
     start_of_month = datetime(now.year, now.month, 1)
-    if now.month == 12:
-        start_of_next_month = datetime(now.year + 1, 1, 1)
-    else:
-        start_of_next_month = datetime(now.year, now.month + 1, 1)
+    start_of_next_month = datetime(now.year + 1, 1, 1) if now.month == 12 else datetime(now.year, now.month + 1, 1)
 
     monthly_sum = db.session.query(func.sum(Order.amount)).filter(
         Order.paid == True,
@@ -492,35 +754,12 @@ def admin_dashboard():
         pending_referers=pending_referers,
         approved_referers=approved_referers,
         rejected_referers=rejected_referers,
+        orders=orders,                 # pass orders for delivered/shipped display
         monthly_earnings=monthly_earnings,
         orders_count=orders_count,
         referrers_count=referrers_count
     )
-    now = datetime.utcnow()
-    start_of_month = datetime(now.year, now.month, 1)
-    if now.month == 12:
-        start_of_next_month = datetime(now.year + 1, 1, 1)
-    else:
-        start_of_next_month = datetime(now.year, now.month + 1, 1)
 
-    monthly_sum = db.session.query(func.sum(Order.amount)).filter(
-        Order.paid == True,
-        Order.created_at >= start_of_month,
-        Order.created_at < start_of_next_month
-    ).scalar() or 0
-    monthly_earnings = int(monthly_sum)
-    total_orders = Order.query.count()
-    total_referers = Referer.query.count()
-
-    return render_template(
-        "admin/dashboard.html",
-        pending_referers=pending_referers,
-        approved_referers=approved_referers,
-        rejected_referers=rejected_referers,
-        monthly_earnings=monthly_earnings,
-        total_orders=total_orders,
-        total_referers=total_referers
-    )
 
 def send_whatsapp_message(phone_number, message):
     api_key = current_app.config.get("CALLMEBOT_API_KEY")
@@ -529,6 +768,7 @@ def send_whatsapp_message(phone_number, message):
         requests.get(url)
     except Exception as e:
         print("WhatsApp message failed:", e)
+
 
 
 @bp.route("/admin/product/add", methods=["GET","POST"])
@@ -560,8 +800,9 @@ def admin_delete_product(pid):
 @bp.route("/admin/referer-requests")
 @login_required
 def referer_requests():
-    requests_ = Referer.query.filter_by(approved=False).all()
-    return render_template("admin/referer_requests.html", requests=requests_)
+    referer_requests = Referer.query.filter_by(status="pending").all()
+    return render_template("admin/referer_requests.html", referer_requests=referer_requests)
+
 
 def send_whatsapp_message(phone_number, message):
     """Send WhatsApp message using CallMeBot API (or your preferred provider)."""
@@ -571,37 +812,6 @@ def send_whatsapp_message(phone_number, message):
         requests.get(url)
     except Exception as e:
         print("WhatsApp message failed:", e)
-
-@bp.route("/admin/approve-referer/<int:id>", methods=["POST"])
-@login_required
-def admin_approve_referer(id):
-    referer = Referer.query.get_or_404(id)
-
-    if referer.status == "approved":
-        flash("This referer is already approved.", "info")
-        return redirect(url_for("main.admin_dashboard"))
-
-    referer.status = "approved"
-    db.session.commit()
-
-    try:
-        message = f"Hi {referer.name}, your referer application has been approved! 🎉 You can now log in using your WhatsApp number: {referer.whatsapp}"
-        send_whatsapp_message(referer.whatsapp, message)
-        send_email(
-            "Referer Approved",
-            [referer.email],
-            f"<p>Hi {referer.name}, your referer account has been approved!</p>"
-        )
-    except Exception as e:
-        print("Notification error:", e)
-
-    flash(f"{referer.name} has been approved successfully!", "success")
-    return redirect(url_for("main.admin_dashboard"))
-
-
-
-@bp.route("/admin/reject-referer/<int:id>", methods=["POST"])
-@login_required
 
 
 
@@ -624,18 +834,6 @@ def admin_pay_withdrawal(id):
 
 
 
-@login_required
-def admin_reject_referer(id):
-    if current_user.username != 'admin':
-        flash('Access denied.', 'danger')
-        return redirect(url_for('main.index'))
-
-    referer = Referer.query.get_or_404(id)
-    referer.status = 'rejected'
-    db.session.commit()
-
-    flash(f'{referer.name} has been rejected.', 'warning')
-    return redirect(url_for('main.admin_dashboard'))
 
 
 @bp.route("/uploads/<filename>")
@@ -744,7 +942,7 @@ def admin_order_view(order_id):
         return redirect(url_for("main.index"))
 
     order = Order.query.get_or_404(order_id)
-    items = json.loads(order.items)
+    items = order.order_items
     return render_template("admin/order_view.html", order=order, items=items)
 
 
@@ -762,6 +960,9 @@ def admin_toggle_delivered(order_id):
         return redirect(url_for("main.admin_order_view", order_id=order_id))
 
     order.delivered = not order.delivered
+    if order.delivered:
+        for item in order.order_items:
+            item.collected_quantity = item.quantity
     db.session.commit()
 
     flash(f"Order marked as {'delivered' if order.delivered else 'not delivered'}.", "success")
@@ -788,12 +989,55 @@ def admin_toggle_terminated(order_id):
     return redirect(url_for("main.admin_orders"))
 
 
+
+@bp.route("/payment_confirmation/<reference>")
+def payment_confirmation(reference):
+    order = Order.query.filter_by(reference=reference).first_or_404()
+    return render_template("payment_confirmation.html", order=order)
+
+@bp.route("/resend-pickup-code", methods=["POST"])
+def resend_pickup_code():
+    data = request.get_json()
+    reference = data.get("reference")
+    email = data.get("email")
+
+    if not reference or not email:
+        return jsonify(success=False, message="Reference and email required")
+
+    order = Order.query.filter_by(reference=reference, email=email).first()
+
+    if not order:
+        return jsonify(success=False, message="Order not found")
+
+    if not order.paid:
+        return jsonify(success=False, message="Order not paid")
+
+    if order.delivered:
+        return jsonify(success=False, message="Order already delivered")
+
+    send_email(
+        "Your Pickup Code",
+        [order.email],
+        f"""
+        <p>Your order <b>{order.reference}</b></p>
+        <p><b>Pickup Code:</b> {order.pickup_code}</p>
+        <p>You can use this code any day to collect your product.</p>
+        """
+    )
+
+    return jsonify(success=True, message="Pickup code sent to your email")
+
+
+@bp.route("/retrieve-pickup")
+def retrieve_pickup():
+    return render_template("retrieve_pickup.html")
+
+
+
 @bp.route('/staff/signup', methods=['GET','POST'])
 def staff_signup():
     if request.method == 'POST':
         data = request.form
-
-        # Basic uniqueness checks
         if Staff.query.filter_by(username=data['username']).first():
             flash("Username already exists. Please choose a different one.", "error")
             return redirect(url_for('main.staff_signup'))
@@ -806,18 +1050,15 @@ def staff_signup():
             flash("NIN already exists. Please check your NIN.", "error")
             return redirect(url_for('main.staff_signup'))
 
-        # Handle optional files safely
         profile_image = None
         if 'image' in data and data['image']:
             profile_image = save_base64_image(data['image'])
 
-        # Handle document uploads
         documents = None
         if 'documents' in request.files:
             files = request.files.getlist('documents')
             saved_docs = []
 
-            # Ensure the folder exists
             upload_dir = os.path.join(current_app.static_folder, "documents")
             os.makedirs(upload_dir, exist_ok=True)
 
@@ -827,12 +1068,11 @@ def staff_signup():
                     rel_path = f"documents/{filename}"
                     abs_path = os.path.join(current_app.static_folder, rel_path)
                     file.save(abs_path)
-                    saved_docs.append(rel_path)  # save relative path only
+                    saved_docs.append(rel_path)
 
             if saved_docs:
-                documents = ",".join(saved_docs)  # comma-separated paths
+                documents = ",".join(saved_docs)
 
-        # Create staff object
         staff = Staff(
             staff_id=f"HPL{int(time.time())}",
             name=data.get('name'),
@@ -886,6 +1126,90 @@ def staff_login():
     return render_template('staff/login.html')
 
 
+@bp.route('/staff/forgot-password', methods=['GET', 'POST'])
+def staff_forgot_password():
+    if request.method == 'POST':
+        email = request.form['email']
+        staff = Staff.query.filter_by(email=email).first()
+
+        if staff:
+            staff.reset_token = secrets.token_urlsafe(32)
+            staff.reset_token_expires = datetime.utcnow() + timedelta(minutes=30)
+            db.session.commit()
+
+            reset_link = url_for(
+                'main.staff_reset_password',
+                token=staff.reset_token,
+                _external=True
+            )
+
+            flash("Reset link generated. Contact admin or check server log.", "info")
+            print("RESET LINK:", reset_link)
+            return redirect(reset_link)
+
+
+        flash("If the email exists, a reset link has been sent.")
+        return redirect(url_for('main.staff_login'))
+
+    return render_template('staff/forgot_password.html')
+
+#@bp.route('/staff/reset-password/<token>', methods=['GET', 'POST'])
+#def staff_reset_password(token):
+ #   staff = Staff.query.filter_by(reset_token=token).first()
+
+  #  if not staff or staff.reset_token_expires < datetime.utcnow():
+   #     flash("Reset link is invalid or expired")
+    #    return redirect(url_for('main.staff_login'))
+
+#    if request.method == 'POST':
+ #       new_password = request.form['password']
+  #      staff.password = generate_password_hash(new_password)
+   #     staff.reset_token = None
+    #    staff.reset_token_expires = None
+     #   db.session.commit()
+
+      #  flash("Password updated. You can log in now.")
+     #   return redirect(url_for('main.staff_login'))
+
+   # return render_template('staff/reset_password.html')
+
+
+
+
+@bp.route('/staff/reset-password/<token>', methods=['GET', 'POST'])
+def staff_reset_password(token):
+    staff = Staff.query.filter_by(reset_token=token).first()
+
+    if not staff:
+        flash("Invalid or expired reset link.", "danger")
+        return redirect(url_for('main.staff_login'))
+
+    if staff.reset_token_expires < datetime.utcnow():
+        flash("Reset link has expired.", "danger")
+        return redirect(url_for('main.staff_forgot_password'))
+
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm = request.form.get('confirm_password')
+
+        if not password or not confirm:
+            flash("All fields are required.", "warning")
+            return redirect(request.url)
+
+        if password != confirm:
+            flash("Passwords do not match.", "warning")
+            return redirect(request.url)
+
+        staff.password = generate_password_hash(password)
+        staff.reset_token = None
+        staff.reset_token_expires = None
+        db.session.commit()
+
+        flash("Password has been reset successfully.", "success")
+        return redirect(url_for('main.staff_login'))
+
+    return render_template('staff/reset_password.html', token=token)
+
 
 @bp.route('/staff/dashboard')
 def staff_dashboard():
@@ -923,20 +1247,13 @@ def decline_staff(id):
     return redirect(url_for('main.staff_verification'))
 
 
-import os
-from flask import current_app
-
 @bp.route('/admin/delete/<int:id>', methods=['POST'])
 def delete_staff(id):
     staff = Staff.query.get_or_404(id)
-
-    # delete profile image
     if staff.profile_image:
         path = os.path.join(current_app.static_folder, staff.profile_image)
         if os.path.exists(path):
             os.remove(path)
-
-    # delete document(s)
     if staff.documents:
         for doc in staff.documents.split(','):
             path = os.path.join(current_app.static_folder, doc)
@@ -981,12 +1298,8 @@ def staff_work():
     if staff.verification_status != "approved":
         flash("Your account is not approved yet.")
         return redirect(url_for('main.staff_dashboard'))
-
-    # ROLE ROUTING
     if staff.role.lower() == "sales":
         return redirect(url_for('main.sales_dashboard'))
-
-    # fallback for other roles
     template_path = f"roles/{staff.role.lower()}.html"
     try:
         return render_template(template_path, staff=staff)
@@ -1018,9 +1331,6 @@ def pay_staffs(staffs):
         ]
     }
     return requests.post(url, headers=headers, json=payload).json()
-
-
-
 
 def verify_nin_face(nin, image):
     url = "https://api.dojah.io/api/v1/kyc/nin/verify"
@@ -1092,18 +1402,13 @@ def staff_add_product():
 @bp.route('/staff/product/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 def staff_edit_product(id):
-    staff = current_user
-
-    # Block non-sales or anonymous users
-    if not hasattr(staff, "role") or staff.role != 'Sales':
-        abort(403)
-
+    staff = staff_required(role="sales")
     product = Product.query.get_or_404(id)
 
     if request.method == 'POST':
-        product.name = request.form.get('name')
-        product.description = request.form.get('description')
-        product.price = request.form.get('price')
+        product.name = request.form['name']
+        product.description = request.form['description']
+        product.price = request.form['price']
 
         image = request.files.get('image')
         if image and image.filename:
@@ -1128,7 +1433,6 @@ def staff_delete_product(id):
 
     product = Product.query.get_or_404(id)
 
-    # Optional: delete image file
     if product.image:
         img_path = os.path.join(current_app.config['UPLOAD_FOLDER'], product.image)
         if os.path.exists(img_path):
@@ -1193,16 +1497,12 @@ def download_documents(staff_id):
     if not staff.documents:
         abort(404, description="No documents found for this staff.")
 
-    # Split the document paths
     doc_list = staff.documents.split(',')
-
-    # Create an in-memory ZIP file
     memory_file = BytesIO()
     with zipfile.ZipFile(memory_file, 'w') as zf:
         for doc_path in doc_list:
             abs_path = os.path.join(current_app.static_folder, doc_path)
             if os.path.exists(abs_path):
-                # Add file to zip, name it with its original filename
                 zf.write(abs_path, arcname=os.path.basename(abs_path))
     memory_file.seek(0)
 
@@ -1216,5 +1516,5 @@ def download_documents(staff_id):
 
 @bp.route('/signup')
 def signup():
-    banks = Bank.query.order_by(Bank.name).all()  # fetch all banks
+    banks = Bank.query.order_by(Bank.name).all()
     return render_template('signup.html', banks=banks)

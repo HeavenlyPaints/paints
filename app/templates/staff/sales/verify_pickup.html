@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+
+    <h3>Verify Pickup</h3>
+
+    <div class="mb-3">
+        <label>Pickup Code</label>
+        <input type="text" id="pickupCode" class="form-control">
+    </div>
+
+    <button class="btn btn-primary" onclick="verifyCode()">Verify</button>
+
+    <hr>
+
+    <div id="orderSection" style="display:none;">
+        <h5>Customer: <span id="customerName"></span></h5>
+
+        <table class="table table-bordered mt-3">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Ordered</th>
+                    <th>Collected</th>
+                    <th>Remaining</th>
+                    <th>Collect Now</th>
+                </tr>
+            </thead>
+            <tbody id="itemsTable"></tbody>
+        </table>
+
+        <button class="btn btn-success" onclick="collectItems()">Confirm Collection</button>
+    </div>
+
+</div>
+
+<script>
+
+let currentOrderId = null;
+
+function verifyCode() {
+
+    const code = document.getElementById("pickupCode").value;
+
+    fetch("/admin/verify-pickup", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ pickup_code: code })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        if (!data.success) {
+            alert(data.message);
+            return;
+        }
+
+        currentOrderId = data.order_id;
+
+        document.getElementById("customerName").innerText = data.customer;
+
+        const table = document.getElementById("itemsTable");
+        table.innerHTML = "";
+
+        data.items.forEach(item => {
+
+            table.innerHTML += `
+                <tr>
+                    <td>${item.product_name}</td>
+                    <td>${item.ordered_quantity}</td>
+                    <td>${item.collected_quantity}</td>
+                    <td>${item.remaining_quantity}</td>
+                    <td>
+                        <input type="number"
+                               min="0"
+                               max="${item.remaining_quantity}"
+                               data-item-id="${item.item_id}"
+                               class="form-control collect-input">
+                    </td>
+                </tr>
+            `;
+        });
+
+        document.getElementById("orderSection").style.display = "block";
+    });
+}
+
+
+function collectItems() {
+
+    const inputs = document.querySelectorAll(".collect-input");
+
+    let updates = [];
+
+    inputs.forEach(input => {
+
+        const qty = parseInt(input.value);
+
+        if (qty && qty > 0) {
+            updates.push({
+                item_id: input.dataset.itemId,
+                collect_qty: qty
+            });
+        }
+    });
+
+    if (updates.length === 0) {
+        alert("Enter at least one quantity to collect");
+        return;
+    }
+
+    fetch("/admin/collect-items", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+            order_id: currentOrderId,
+            updates: updates
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        alert(data.message);
+
+        if (data.success) {
+
+            if (data.fully_collected) {
+                alert("Order fully collected. And the  code expired.");
+                document.getElementById("orderSection").style.display = "none";
+            } else {
+                verifyCode();  // Refresh data
+            }
+        }
+    });
+}
+
+</script>
+
+{% endblock %}

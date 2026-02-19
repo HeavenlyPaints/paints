@@ -23,7 +23,7 @@
 <h2>Staff Registration</h2>
 
 <h3> Sign up below or <a href="{{ url_for('main.staff_login') }}">Sign in here....</a></h3>
-<form id="staffForm" method="POST" enctype="multipart/form-data">
+<form id="staffForm" method="POST" action="{{ url_for('main.staff_signup') }}" enctype="multipart/form-data">
 
   <div class="phase" id="phase1">
     <h3>Personal Information</h3>
@@ -157,6 +157,17 @@
 
 </form>
 
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul class="flashes">
+      {% for category, message in messages %}
+        <li class="{{ category }}">{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+
 <script>
 let currentPhase = 1;
 const totalPhases = 6;
@@ -246,7 +257,7 @@ function validateFaceAndProceed(){
     return;
   }
   faceError.style.display = 'none';
-  nextPhase(5); 
+  nextPhase(4); 
 }
 </script>
 

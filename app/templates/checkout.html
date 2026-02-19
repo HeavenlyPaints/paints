@@ -15,10 +15,33 @@
     <h4>Cart</h4>
     <ul>
       {% for it in cart %}
-      <li>{{ it.name }} x{{ it.qty }} — ₦{{ "{:,.2f}".format(it.price * it.qty) }}</li>
+      <li>
+  <strong>{{ it.name }}</strong><br>
+
+  Color:
+  Color:
+{% if it.color_name %}
+  <span style="display:inline-block;width:12px;height:12px;background:{{ it.color_name }};border:1px solid #000;"></span>
+  {{ it.color_name }}
+{% else %}
+  — 
+{% endif %}
+<br>
+
+  Qty: {{ it.qty }} — ₦{{ "{:,.2f}".format(it.price * it.qty) }}
+</li>
+
       {% endfor %}
     </ul>
     <p>Total: ₦{{ "{:,.2f}".format(amount) }}</p>
   </div>
 </div>
+
+<script>
+document.querySelector("form").addEventListener("submit", async function(e){
+    e.preventDefault(); 
+    this.submit();
+});
+</script>
+
 {% endblock %}

@@ -11,7 +11,7 @@
     <div class="price">₦{{ "{:,.2f}".format(product.price) }}</div><br><br>
 
     <div class="actions">
-      <button class="btn" onclick="openColorPicker('{{ product.id }}')">Add to Cart 🛒</button>
+      <button class="btn" onclick="addToCart('{{ product.id }}')">Add to Cart 🛒</button>
     </div>
 
     <!-- YOUR RATING SECTION (UNCHANGED) -->
@@ -88,80 +88,8 @@
 }
 </style>
 
-<script>
-let selectedProductId = null;
-let colorBank = [];
 
-// AUTO LOAD 1000+ COLORS
-async function loadColors() {
-    for (let i = 0; i < 10; i++) {  
-        let url = 
-`https://www.thecolorapi.com/scheme?count=
-100&mode=analogic&hex=${Math.floor(Math.random()*16777215).toString(16)}`;
-        try {
-            let res = await fetch(url);
-            let data = await res.json();
-            data.colors.forEach(c => {
-                colorBank.push({
-                    name: c.name.value,
-                    hex: c.hex.value,
-                    img: c.image.bare
-                });
-            });
-        } catch (e) { console.log("ColorAPI error:", e); }
-    }
-}
-loadColors();
 
-// STEP 1: OPEN POPUP
-function openColorPicker(productId) {
-    selectedProductId = productId;
-    document.getElementById("colorModal").style.display = "block";
-}
-
-// STEP 2: FILTER COLORS BY NAME
-function searchColors() {
-    let query = document.getElementById("colorSearch").value.toLowerCase();
-    let results = document.getElementById("colorResults");
-    results.innerHTML = "";
-
-    let matches = colorBank.filter(c => c.name.toLowerCase().includes(query));
-
-    matches.forEach(color => {
-        let item = document.createElement("div");
-        item.className = "color-item";
-        item.innerHTML = `
-            <img src="${color.img}" />
-            <span>${color.name}</span>
-        `;
-        item.onclick = () => chooseColor(color);
-        results.appendChild(item);
-    });
-}
-
-// STEP 3: SEND TO BACKEND
-function chooseColor(color) {
-    fetch("/add-to-cart-color", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            product_id: selectedProductId,
-            color_name: color.name,
-            color_hex: color.hex
-        })
-    })
-    .then(r => r.json())
-    .then(() => {
-        alert("Added to cart");
-        closeColorModal();
-    });
-}
-
-function closeColorModal() {
-    document.getElementById("colorModal").style.display = "none";
-    document.getElementById("colorSearch").value = "";
-    document.getElementById("colorResults").innerHTML = "";
-}
-</script>
+<script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 
 {% endblock %}
