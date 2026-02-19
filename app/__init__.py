@@ -29,7 +29,7 @@ def create_app():
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
     with app.app_context():
-        from app.models import User
+        from app.models import Admin
         db.create_all()
 
         if not User.query.filter_by(username="admin").first():
