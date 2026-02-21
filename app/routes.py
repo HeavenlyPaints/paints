@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from flask import send_file, abort, current_app
 import io
 import os
+from PIL import Image
 from .models import OrderItem
 from app.models import Bank
 import zipfile
@@ -768,13 +769,27 @@ def add_product():
         if f:
             fname = secure_filename(f.filename)
             path = os.path.join(current_app.config['UPLOAD_FOLDER'], fname)
-            f.save(path)
+
+            img = Image.open(f)
+            img = img.convert("RGB")
+            img.thumbnail((1200, 1200))
+            img.save(path, optimize=True, quality=70)
+
             filename = fname
-        p = Product(name=form.name.data, description=form.description.data, price=form.price.data, image=filename)
-        db.session.add(p); db.session.commit()
+
+        p = Product(
+            name=form.name.data,
+            description=form.description.data,
+            price=form.price.data,
+            image=filename
+        )
+        db.session.add(p)
+        db.session.commit()
         flash("Product added", "success")
         return redirect(url_for("main.admin_dashboard"))
     return render_template("admin/add_product.html", form=form)
+
+
 
 @bp.route("/admin/product/delete/<int:pid>", methods=["POST"])
 @login_required
@@ -836,12 +851,11 @@ def uploaded_file(filename):
 
 
 
-
 def badge_for_count(count):
-    if count >= 19: return ("Sapphire", 15)
-    if count >= 15: return ("Platinum", 13)
-    if count >= 11: return ("Gold", 12)
-    if count >= 8: return ("Silver", 11)
+    if count >= 25: return ("Sapphire", 15)
+    if count >= 20: return ("Platinum", 13)
+    if count >= 15: return ("Gold", 12)
+    if count >= 10: return ("Silver", 11)
     if count >= 5: return ("Wood", 10)
     return (None, 9)
 
