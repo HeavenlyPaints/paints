@@ -825,7 +825,17 @@ def admin_pay_withdrawal(id):
 
 @bp.route("/uploads/<filename>")
 def uploaded_file(filename):
-    return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
+    upload_folder = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
+
+    file_path = os.path.join(upload_folder, filename)
+
+    if not os.path.exists(file_path):
+        abort(404)
+
+    return send_from_directory(upload_folder, filename)
+
+
+
 
 def badge_for_count(count):
     if count >= 19: return ("Sapphire", 15)
