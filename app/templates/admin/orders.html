@@ -10,49 +10,70 @@
             <tr>
                 <th>Reference</th>
                 <th>Customer</th>
-                <th>Ordered Products</th>
+                <th>Ordered Products (Name & Color)</th>
                 <th>Amount (₦)</th>
                 <th>Paid</th>
                 <th>Delivered</th>
-                <th>Terminated</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for o in orders %}
             <tr>
-                <td>{{ o.reference }}</td>
+                <td><strong>{{ o.reference }}</strong></td>
                 <td>
                     {{ o.name }}<br>
-                    {{ o.email }}<br>
-                    {{ o.phone }}
+                    <small>{{ o.email }}</small><br>
+                    <small>{{ o.phone }}</small>
                 </td>
                 <td>
-                    <ul class="list-unstyled mb-0">
-                        {% for item in o.items_parsed %}
-                        <li>{{ item.name }} (Qty: {{ item.qty }}) - ₦{{ "{:,.2f}".format(item.price) }}</li>
+                    <ul class="list-unstyled mb-0" style="padding-left: 0;">
+                        {% for item in o.order_items %}
+                        <li style="margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px;">
+                            <strong>{{ item.product.name if item.product else 'Deleted Product' }}</strong><br>
+                            Qty: {{ item.quantity }} {% if item.unit %} {{ item.unit }}{% if item.quantity > 1 %}s{% endif %}{% endif %}<br>
+                            
+                            {% if item.color_name %}
+                                <span style="font-size: 0.9em; color: #555;">
+                                    Color: <strong>{{ item.color_name }}</strong> 
+                                </span>
+                            {% else %}
+                                <span style="font-size: 0.9em; color: #999;">Color: Standard/None</span>
+                            {% endif %}
+
+                            {% if item.color_hex %}
+                                <span style="display:inline-block; width:14px; height:14px; background-color:{{ item.color_hex }}; border:1px solid #000; border-radius: 3px; vertical-align: middle; margin-left: 5px;"></span>
+                            {% endif %}
+                        </li>
+                        {% else %}
+                        <li>No items found.</li>
                         {% endfor %}
                     </ul>
                 </td>
                 <td>₦{{ "{:,.2f}".format(o.amount) }}</td>
-                <td>{{ 'Yes' if o.paid else 'No' }}</td>
-                <td>{{ 'Yes' if o.delivered else 'No' }}</td>
-                <td>{{ 'Yes' if o.terminated else 'No' }}</td>
                 <td>
-                    <form action="{{ url_for('main.admin_toggle_delivered', order_id=o.id) }}" method="POST" style="display:inline">
-                        {% if not o.delivered %}
-                        <button class="btn" type="submit">Mark as Delivered</button>
-                        {% else %}
-                        <button class="btn" type="submit">Mark as Not Delivered</button>
-                        {% endif %}
-                    </form>
+                    {% if o.paid %}
+                        <span style="color: green; font-weight: bold;">Yes</span>
+                    {% else %}
+                        <span style="color: red;">No</span>
+                    {% endif %}
+                </td>
+                <td>{{ 'Yes' if o.delivered else 'No' }}</td>
+                <td>
+                    {% if o.paid %}
+                        <form action="{{ url_for('main.admin_toggle_delivered', order_id=o.id) }}" method="POST" style="display:inline">
+                            {% if not o.delivered %}
+                                <button class="btn btn-success btn-sm" type="submit" style="margin-bottom: 5px;">Mark Delivered</button>
+                            {% else %}
+                                <button class="btn btn-warning btn-sm" type="submit" style="margin-bottom: 5px;">Undo Delivery</button>
+                            {% endif %}
+                        </form>
+                    {% else %}
+                        <span style="font-size: 0.85em; color: #777; display: block; margin-bottom: 5px;">Awaiting Payment</span>
+                    {% endif %}
 
-                    <form action="{{ url_for('main.admin_toggle_terminated', order_id=o.id) }}" method="POST" style="display:inline">
-                        {% if not o.terminated %}
-                        <button class="btn" type="submit">Terminate</button>
-                        {% else %}
-                        <button class="btn" type="submit">Undo Terminate</button>
-                        {% endif %}
+                    <form action="{{ url_for('main.admin_delete_order', order_id=o.id) }}" method="POST" style="display:inline" onsubmit="return confirm('Are you sure you want to completely delete this order? This cannot be undone.');">
+                        <button class="btn btn-danger btn-sm" type="submit">Delete Order</button>
                     </form>
                 </td>
             </tr>
@@ -62,4 +83,3 @@
 </div>
 
 {% endblock %}
-

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 40px auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+    <h2>Log a Cash Sale (POS)</h2>
+    <p style="color: #666; margin-bottom: 20px;">Use this form to document physical in-store purchases. This will bypass Paystack and immediately mark the order as Paid and Delivered in the database.</p>
+
+    <form action="{{ url_for('main.admin_manual_order') }}" method="POST">
+
+        <fieldset style="border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+            <legend style="padding: 0 10px; font-weight: bold;">Customer Details</legend>
+            <input type="text" name="name" placeholder="Customer Name (e.g. John Doe)" required style="width: 100%; padding: 10px; margin-bottom: 10px;">
+            <input type="text" name="phone" placeholder="Phone Number (Optional)" style="width: 100%; padding: 10px; margin-bottom: 10px;">
+            <input type="email" name="email" placeholder="Email (Optional)" style="width: 100%; padding: 10px;">
+        </fieldset>
+
+        <fieldset style="border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+            <legend style="padding: 0 10px; font-weight: bold;">Product Details</legend>
+            
+            <label style="font-weight: bold; display: block; margin-bottom: 5px;">Select Paint Type</label>
+            <select name="product_id" required style="width: 100%; padding: 10px; margin-bottom: 15px;">
+                <option value="" disabled selected>-- Choose Product --</option>
+                {% for p in products %}
+                    <option value="{{ p.id }}">{{ p.name }} (₦{{ "{:,.2f}".format(p.price) }} / bucket)</option>
+                {% endfor %}
+            </select>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">Quantity</label>
+                    <input type="number" name="qty" step="0.1" min="0.1" value="1" required style="width: 100%; padding: 10px;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-weight: bold; display: block; margin-bottom: 5px;">Unit</label>
+                    <select name="unit" style="width: 100%; padding: 10px;">
+                        <option value="buckets">Buckets</option>
+                        <option value="liters">Liters</option>
+                    </select>
+                </div>
+            </div>
+
+            <label style="font-weight: bold; display: block; margin-bottom: 5px;">Color Choice</label>
+            <input type="text" name="color_name" placeholder="Color Name (e.g., Pure White, Off White)" style="width: 100%; padding: 10px; margin-bottom: 10px;">
+            
+            <label style="font-weight: bold; display: block; margin-bottom: 5px;">Color Hex (Optional)</label>
+            <input type="color" name="color_hex" value="#ffffff" style="width: 100%; padding: 5px; height: 40px; cursor: pointer;">
+        </fieldset>
+
+        <button type="submit" class="btn btn-success" style="width: 100%; padding: 15px; font-size: 1.1em; font-weight: bold;">Submit Cash Sale</button>
+    </form>
+</div>
+{% endblock %}

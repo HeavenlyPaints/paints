@@ -3,7 +3,6 @@
 
 <h2>Staff Verification Panel</h2>
 
-
 <div style="width:100%;overflow-x:auto;">
   <table border="1" cellpadding="10" cellspacing="0" width="100%" style="min-width:70px;">
     <thead>
@@ -30,7 +29,6 @@
     <tbody>
       {% for staff in staffs %}
       <tr>
-
         <td>
           {% if staff.profile_image %}
             <img src="{{ url_for('static', filename=staff.profile_image) }}"
@@ -52,20 +50,17 @@
         <td>{{ staff.account_number }}</td>
         <td>{{ staff.account_name }}</td>
         <td>{{ staff.nationality }}</td>
-<td>{{ staff.state }}</td>
-<td>{{ staff.lga }}</td>
-<td class="docs-cell">
-  {% if staff.documents %}
-    <form method="GET" action="{{ url_for('main.download_documents', staff_id=staff.id) }}">
-      <button type="submit" class="btn" style="background:blue;color:white;">Download</button>
-    </form>
-  {% else %}
-    <span>No Documents</span>
-  {% endif %}
-</td>
-
-
-
+        <td>{{ staff.state }}</td>
+        <td>{{ staff.lga }}</td>
+        <td class="docs-cell">
+          {% if staff.documents %}
+            <form method="GET" action="{{ url_for('main.download_documents', staff_id=staff.id) }}">
+              <button type="submit" class="btn" style="background:blue;color:white;">Download</button>
+            </form>
+          {% else %}
+            <span>No Documents</span>
+          {% endif %}
+        </td>
 
         <td>
           {% if staff.verification_status == 'approved' %}
@@ -78,45 +73,35 @@
         </td>
 
         <td style="white-space:nowrap;">
-
           {% if staff.verification_status == 'pending' %}
+              <form method="POST" action="{{ url_for('main.verify_staff', id=staff.id) }}" style="display:inline;">
+                <button type="submit" style="background:green;color:white;" class="btn">Approve</button>
+              </form>
 
-  <form method="POST" action="{{ url_for('main.verify_staff', id=staff.id) }}" style="display:inline;">
-    <button type="submit" style="background:green;color:white;" class="btn">Approve</button>
-  </form>
+              <form method="POST" action="{{ url_for('main.decline_staff', id=staff.id) }}" style="display:inline;" onsubmit="return handleDecline(this);">
+                <input type="hidden" name="reason" class="decline-reason-input">
+                <button type="submit" style="background:orange;color:white;" class="btn">Decline</button>
+              </form>
 
-  <form method="POST" action="{{ url_for('main.decline_staff', id=staff.id) }}" style="display:inline;">
-    <button type="submit" style="background:orange;color:white;" class="btn">Decline</button>
-  </form>
+          {% elif staff.verification_status == 'approved' %}
+              <span style="color:gray;">✔ Verified</span>
 
-{% elif staff.verification_status == 'approved' %}
+              <form method="POST"
+                    action="{{ url_for('main.delete_staff', id=staff.id) }}"
+                    style="display:inline;margin-left:5px;"
+                    onsubmit="return confirm('Are you sure you want to permanently delete the approved staff?');">
+                <button type="submit" style="background:red;color:white;" class="btn">Terminate</button>
+              </form>
 
-  <span style="color:gray;">✔ Verified</span>
-
-  <form method="POST"
-        action="{{ url_for('main.delete_staff', id=staff.id) }}"
-        style="display:inline;margin-left:5px;"
-        onsubmit="return confirm('Are you sure you want to permanently delete the approved staff?');">
-
-    <button type="submit" style="background:red;color:white;" class="btn">Terminate</button>
-  </form>
-
-{% elif staff.verification_status == 'declined' %}
-
-  <form method="POST"
-        action="{{ url_for('main.delete_staff', id=staff.id) }}"
-        style="display:inline;"
-        onsubmit="return confirm('Are you sure you want to permanently delete this staff?');">
-
-    <button type="submit" style="background:red;color:white;" class="btn">Delete</button>
-  </form>
-
-
-{% endif %}
-
-
+          {% elif staff.verification_status == 'declined' %}
+              <form method="POST"
+                    action="{{ url_for('main.delete_staff', id=staff.id) }}"
+                    style="display:inline;"
+                    onsubmit="return confirm('Are you sure you want to permanently delete this staff?');">
+                <button type="submit" style="background:red;color:white;" class="btn">Delete</button>
+              </form>
+          {% endif %}
         </td>
-
       </tr>
       {% endfor %}
     </tbody>
@@ -128,7 +113,6 @@
 <a href="{{ url_for('main.export_staff_csv') }}">
   <button class="btn">Export Verified Staff Accounts (CSV)</button>
 </a>
-
 
 <div id="imageModal" style="
   display:none;
@@ -167,7 +151,18 @@ function openImageModal(src) {
 function closeImageModal() {
   document.getElementById('imageModal').style.display = 'none';
 }
+
+function handleDecline(formElement) {
+    let reason = prompt("Please type the reason for declining this staff application:");
+    
+    if (reason === null || reason.trim() === "") {
+        alert("Action canceled: A reason is required to decline an application.");
+        return false; 
+    }
+    
+    formElement.querySelector('.decline-reason-input').value = reason;
+    return true;
+}
 </script>
 
 {% endblock %}
-

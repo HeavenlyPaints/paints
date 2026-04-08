@@ -27,15 +27,26 @@
     <div class="dashboard-card center">
       <h2>Staff Dashboard</h2>
 
-      <p class="status declined">
-        <strong>Status:</strong> Application Declined
-      </p>
+      <div style="background-color: #f8d7da; color: #721c24; padding: 20px; border: 1px solid #f5c6cb; border-radius: 8px; margin: 20px 0; text-align: left;">
+          <h3 style="margin-top: 0; color: #721c24;">❌ Application Declined</h3>
+          <p style="margin-bottom: 10px;">Unfortunately, your staff application has been declined by the administrator.</p>
+          
+          <div style="background-color: white; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545;">
+              <strong style="color: #333;">Reason from Admin:</strong><br>
+              <span style="color: #555; line-height: 1.5;">
+                  {{ staff.rejection_reason if staff.rejection_reason else "No specific reason provided. Please contact the administrator for clarification." }}
+              </span>
+          </div>
+      </div>
 
-      <p>Please contact the administrator for clarification.</p>
-
-      <form method="POST" action="{{ url_for('main.staff_logout') }}">
-        <button class="btn danger">Logout</button>
-      </form>
+      <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+          <a href="{{ url_for('main.staff_reapply') }}" style="text-decoration: none;">
+              <button class="btn" style="background-color: #007bff; color: white;">Update & Re-apply</button>
+          </a>
+          <form method="POST" action="{{ url_for('main.staff_logout') }}" style="margin: 0;">
+            <button class="btn danger">Logout</button>
+          </form>
+      </div>
     </div>
 
   {% elif staff.verification_status == 'approved' %}

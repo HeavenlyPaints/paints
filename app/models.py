@@ -26,6 +26,7 @@ class Product(db.Model):
     image = db.Column(db.String(300))
     sold = db.Column(db.Integer, default=0)
     delivered = db.Column(db.Integer, default=0)
+    unit = db.Column(db.String(20), default="pcs")
     product_type = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -33,13 +34,13 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     reference = db.Column(db.String(100), unique=True, nullable=False)
 
-    name = db.Column(db.String(100))
-    email = db.Column(db.String(120))
-    phone = db.Column(db.String(20))
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
+    phone = db.Column(db.String(20), nullable=False)
     terminated = db.Column(db.Boolean, default=False)
-    amount = db.Column(db.Float)
+    amount = db.Column(db.Float, nullable=False)
     paid = db.Column(db.Boolean, default=False)
-
+    total_amount = db.Column(db.Float, nullable=True)
     pickup_code = db.Column(db.String(10), unique=True)
     pickup_generated_at = db.Column(db.DateTime)
     delivered = db.Column(db.Boolean, default=False)
@@ -65,15 +66,20 @@ class OrderItem(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
 
-    quantity = db.Column(db.Integer, nullable=False)
-    collected_quantity = db.Column(db.Integer, default=0)
+    quantity = db.Column(db.Float, nullable=False)
+    unit = db.Column(db.String(20))
+    color = db.Column(db.String(50))
+    color_name = db.Column(db.String(50))
+    color_hex = db.Column(db.String(20))
+
+    collected_quantity = db.Column(db.Float, default=0)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     order = db.relationship(
         'Order',
-         backref=db.backref('order_items', lazy=True, cascade="all, delete-orphan")
-     )
+        backref=db.backref('order_items', lazy=True, cascade="all, delete-orphan")
+    )
 
     product = db.relationship('Product')
 
@@ -172,3 +178,11 @@ class ReferralEarning(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'))
     amount = db.Column(db.Float)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Coupon(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(50), unique=True, nullable=False)
+    discount_pct = db.Column(db.Float, nullable=False) 
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

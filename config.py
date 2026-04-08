@@ -17,7 +17,7 @@ class Config:
         os.path.join(os.getcwd(),"app","static","uploads")
     )
 
-    MAX_CONTENT_LENGTH = 5 * 1024 * 1024
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024
 
     PAYSTACK_SECRET_KEY = os.environ.get("PAYSTACK_SECRET_KEY")
     PAYSTACK_PUBLIC_KEY = os.environ.get("PAYSTACK_PUBLIC_KEY")

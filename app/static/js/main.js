@@ -108,11 +108,12 @@ li.appendChild(colorWrapper);
     `Total: ₦${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
 }
 
-async function addToCart(pid, qty=1, color=null){
+async function addToCart(pid, qty=1, color=null, unit=null){
 
   const payload = {
     product_id: pid,
     qty: qty,
+    unit: unit,
     color_name: color ? color.name : null,
     color_hex: color ? color.hex : null
   };
@@ -130,6 +131,24 @@ async function addToCart(pid, qty=1, color=null){
   }
 }
 
+
+function confirmQuantity(){
+  const qty  = parseFloat(document.getElementById("qty-input").value);
+  const unit = document.getElementById("unit-input").value;
+
+  if(!qty || qty <= 0){
+    alert("Enter valid quantity");
+    return;
+  }
+
+  window.selectedQty = qty;
+  window.selectedUnit = unit;
+
+  // USE the stored product ID (this is the key fix)
+  openColorModal(qtyProductId, "Select Color");
+
+  closeQtyModal();
+}
 
 
 function showToast(message) {
@@ -169,7 +188,7 @@ async function loadColors() {
 
 function openColorPicker(productId) {
     selectedProductId = productId;
-    document.getElementById("colorModal").style.display = "block";
+    document.getElementById("color-modal").style.display = "block";
     loadColors();
 }
 
@@ -206,7 +225,7 @@ function selectColor(color){
 
 
 function closeColorModal() {
-    document.getElementById("colorModal").style.display = "none";
+    document.getElementById("color-modal").style.display = "none";
     document.getElementById("colorSearch").value = "";
     document.getElementById("colorResults").innerHTML = "";
 }
@@ -214,7 +233,8 @@ function closeColorModal() {
 
 
 
-function openColorModal(productId, productName){
+window.openColorModal = function(productId, productName){
+  if(event) event.preventDefault();
   selectedProductId = productId;
   selectedColor = null;
   document.getElementById('color-modal-title').textContent = productName;
@@ -223,12 +243,17 @@ function openColorModal(productId, productName){
   document.getElementById('color-modal').style.display = 'block';
 }
 
-
-function closeColorModal(){
+window.closeColorModal = function(){
   document.getElementById('color-modal').style.display = 'none';
   selectedProductId = null;
   selectedColor = null;
 }
+
+//function closeColorModal(){
+//  document.getElementById('color-modal').style.display = 'none';
+//  selectedProductId = null;
+//  selectedColor = null;
+//}
 
 
 document.getElementById('color-input').addEventListener('input', async function(){
@@ -367,7 +392,12 @@ document.getElementById('confirm-color-btn').addEventListener('click', async () 
 
   try {
 
-    await addToCart(selectedProductId, 1, selectedColor);
+    await addToCart(
+    selectedProductId,
+    window.selectedQty,
+    selectedColor,
+    window.selectedUnit
+);
 
 
     closeColorModal();

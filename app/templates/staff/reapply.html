@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="dashboard-wrapper">
+    <div class="dashboard-card center" style="max-width: 500px; margin: 0 auto; text-align: left;">
+        <h2 style="text-align: center;">Update Your Application</h2>
+        
+        <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border-left: 4px solid #dc3545; margin-bottom: 20px;">
+            <strong style="color: #721c24;">Admin Note:</strong><br>
+            <span style="color: #721c24;">{{ staff.rejection_reason }}</span>
+        </div>
+
+        <p>Please upload the requested missing documents below to re-submit your application for review.</p>
+
+        <form method="POST" action="{{ url_for('main.staff_reapply') }}" enctype="multipart/form-data">
+            
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: bold; display: block; margin-bottom: 5px;">Upload Additional Documents</label>
+                <input type="file" name="documents" multiple required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                <small style="color: #666;">You can select multiple files if needed.</small>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn" style="background-color: #28a745; color: white; flex: 1;">Re-Submit Application</button>
+                <a href="{{ url_for('main.staff_dashboard') }}" class="btn" style="background-color: #6c757d; color: white; text-align: center; text-decoration: none;">Cancel</a>
+            </div>
+        </form>
+
+    </div>
+</div>
+
+{% endblock %}

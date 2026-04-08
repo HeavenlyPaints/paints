@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt - {{ order.reference }}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-blue: #3b5f9e;
+            --bg-color: #f8f9fa;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+            color: var(--primary-blue);
+            margin: 0;
+        }
+
+        .receipt-container {
+            background-color: white;
+            width: 800px;
+            padding: 40px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            box-sizing: border-box;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .logo-title-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: var(--primary-blue);
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .company-name {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1.1;
+            margin: 0;
+            letter-spacing: 0.5px;
+        }
+        
+        .company-slogan {
+            font-size: 13px;
+            font-style: italic;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .receipt-title-box {
+            border: 2px solid var(--primary-blue);
+            padding: 8px 15px;
+            font-size: 18px;
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .contact-info {
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 15px;
+            line-height: 1.6;
+        }
+
+        .contact-info i {
+            width: 20px;
+            text-align: center;
+        }
+
+        .meta-info {
+            text-align: right;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+
+        .meta-info .receipt-no {
+            font-size: 16px;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .info-tables-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+            margin-bottom: 10px;
+        }
+
+        .info-section { width: 48%; }
+
+        .info-title {
+            font-weight: 700;
+            font-size: 15px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid var(--primary-blue);
+        }
+
+        td, th {
+            border: 1px solid var(--primary-blue);
+            padding: 6px 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .client-table td:first-child { width: 30%; }
+        .payment-table td:first-child { width: 15%; text-align: center; }
+
+        .items-table {
+            margin-bottom: 0;
+            border-bottom: none;
+        }
+
+        .items-table th {
+            background-color: var(--primary-blue);
+            color: white;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+            border-color: white; 
+        }
+
+        .items-table td {
+            height: 28px; 
+            border-color: var(--primary-blue);
+        }
+
+        .col-qty { width: 8%; text-align: center; }
+        .col-desc { width: 47%; }
+        .col-rate { width: 15%; text-align: right; }
+        .col-amt { width: 30%; text-align: right; }
+        .footer-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: -1px; 
+        }
+
+        .signatures {
+            width: 50%;
+            padding-top: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+
+        .sign-line {
+            font-weight: 600;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+
+        .thank-you {
+            font-family: 'Dancing Script', cursive;
+            font-size: 26px;
+            margin-top: 30px;
+            color: var(--primary-blue);
+        }
+
+        .summary-table-container { width: 45%; }
+        .summary-table { border-top: none; }
+        .summary-table td:first-child {
+            width: 40%;
+            text-align: left;
+            font-weight: 600;
+        }
+        .summary-table td:last-child {
+            text-align: right;
+        }
+
+        .summary-table .total-row td {
+            font-weight: 700;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+        @media print {
+            body { background-color: white; padding: 0; }
+            .receipt-container { box-shadow: none; width: 100%; padding: 20px; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="receipt-container">
+        
+        <div class="no-print" style="text-align: right; margin-bottom: 20px;">
+            <button onclick="window.print()" style="background: var(--primary-blue); color: white; padding: 10px 20px; border: none; cursor: pointer; border-radius: 5px; font-weight: bold;">
+                <i class="fa-solid fa-print"></i> Print Receipt
+            </button>
+        </div>
+
+        <div class="header">
+            <div>
+                <div class="logo-title-group">
+                    <div class="logo">∞</div>
+                    <div>
+                        <h1 class="company-name">HEAVENLY<br>PAINT LIMITED</h1>
+                        <div class="company-slogan">Color your world with shree</div>
+                    </div>
+                </div>
+                <div class="contact-info">
+                    <div><i class="fa-solid fa-location-dot"></i> No. 7 Emnaco street Uyo</div>
+                    <div><i class="fa-solid fa-phone"></i> 08122889225, 07077394383</div>
+                    <div><i class="fa-solid fa-envelope"></i> heavenlypaints33@gmail.com</div>
+                </div>
+            </div>
+            <div>
+                <div class="receipt-title-box">
+                    COMPANY<br>RECEIPT
+                </div>
+                <div class="meta-info">
+                    <div class="receipt-no">Ref: &nbsp;&nbsp;<strong>{{ order.reference }}</strong></div>
+                    <div>Date: <strong>{{ order.created_at.strftime('%d %b, %Y') }}</strong></div>
+
+                    {% if order.pickup_code %}
+                    <div style="margin-top: 15px; padding: 10px; border: 2px dashed #dc3545; color: #dc3545; text-align: center; border-radius: 4px;">
+                        <span style="font-size: 12px; font-weight: bold; text-transform: uppercase;">Pickup Code</span><br>
+                        <span style="font-size: 22px; font-weight: 900; letter-spacing: 2px;">{{ order.pickup_code }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="info-tables-container">
+            <div class="info-section">
+                <div class="info-title">CLIENT INFORMATION</div>
+                <table class="client-table">
+                    <tr><td>Name</td><td>{{ order.name }}</td></tr>
+                    <tr><td>Email</td><td>{{ order.email }}</td></tr>
+                    <tr><td>Phone</td><td>{{ order.phone }}</td></tr>
+                </table>
+            </div>
+            <div class="info-section">
+                <div class="info-title">PAYMENT METHOD</div>
+                <table class="payment-table">
+                    <tr><td>{% if 'CASH' not in order.reference %}✔{% endif %}</td><td>Online / Transfer</td></tr>
+                    <tr><td>{% if 'CASH' in order.reference %}✔{% endif %}</td><td>Cash (Walk-in)</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th class="col-qty">QTY</th>
+                    <th class="col-desc">GOODS DESCRIPTION</th>
+                    <th class="col-rate">RATE (₦)</th>
+                    <th class="col-amt">AMOUNT (₦)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.order_items %}
+                    {% set unit_price = (item.product.price / 20) if item.unit == 'liters' else item.product.price %}
+                    {% set row_total = unit_price * item.quantity %}
+                    
+                    <tr>
+                        <td class="col-qty">{{ item.quantity }}</td>
+                        <td class="col-desc">
+                            {{ item.product.name }} 
+                            {% if item.color_name %}(Color: {{ item.color_name }}){% endif %}
+                            [{{ item.unit | title }}]
+                        </td>
+                        <td class="col-rate">{{ "{:,.2f}".format(unit_price) }}</td>
+                        <td class="col-amt">{{ "{:,.2f}".format(row_total) }}</td>
+                    </tr>
+                {% endfor %}
+                
+                {% for i in range(10 - order.order_items|length) %}
+                    {% if i > 0 %}
+                        <tr><td></td><td></td><td></td><td></td></tr>
+                    {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer-section">
+            <div class="signatures">
+                <div class="sign-line">Cashier's Sign/Stamp</div>
+                <div class="sign-line">Customer's Sign</div>
+                <div class="thank-you">Thanks for your patronage!</div>
+            </div>
+            <div class="summary-table-container">
+                <table class="summary-table">
+                    <tr class="total-row">
+                        <td>TOTAL ₦</td>
+                        <td>{{ "{:,.2f}".format(order.amount) }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

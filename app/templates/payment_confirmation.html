@@ -19,6 +19,10 @@
 </button>
   </div>
 
+<a href="{{ url_for('main.view_receipt', reference=order.reference) }}" target="_blank" class="btn btn-primary">
+    View / Print Receipt
+</a>
+
   <p class="warning">
     ⚠️ Please screenshot or save this code.  
     You will need it to collect your product.

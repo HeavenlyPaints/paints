@@ -3,31 +3,92 @@
 
 <section class="hero">
   <h1>Welcome to Heavenly Paint Limited</h1>
-  <p>All colors start with <i>You</i></p>
+  <p>Color your world with <i>Shree</i></p>
 </section>
 
 <section class="product-grid">
-  {% for p in products %}
+{% for p in products %}
   <article class="card">
     <img src="{{ url_for('main.uploaded_file', filename=p.image) if p.image else url_for('static', filename='uploads/placeholder.png') }}" alt="{{ p.name }}">
     <h3>{{ p.name }}</h3>
     <div class="price">₦{{ "{:,.2f}".format(p.price) }}</div>
     <div class="card-actions">
-      <button class="btn" onclick="openColorModal({{ p.id }}, '{{ p.name }}')">Add to cart</button>
+      <!-- Pass the correct product ID -->
+      <button type="button" class="btn" onclick="openQtyModal('{{ p.id }}')">Add to Cart</button>
       <a href="{{ url_for('main.product', pid=p.id) }}" class="btn" style="text-decoration:none">Details</a>
     </div>
   </article>
-  {% endfor %}
+ {% endfor %}
 </section>
 
-<div id="color-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5);">
-  <div style="background:#fff; margin:100px auto; padding:20px; width:400px; border-radius:8px; position:relative;">
-    <h3 id="color-modal-title">Select Color</h3>
-    <input id="color-input" type="text" placeholder="Enter color name or hex (#000000)" style="width:100%; padding:6px; margin-bottom:10px;">
-    <div id="color-suggestions" style="display:flex; flex-wrap:wrap; margin-bottom:10px;"></div>
-    <button id="confirm-color-btn" class="btn">Add to Cart</button>
-    <button onclick="closeColorModal()" class="btn" style="background:#ccc; margin-left:10px;">Cancel</button>
+<!-- ================= QUANTITY MODAL ================= -->
+<div id="qty-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999;">
+  <div style="background:#fff; width:400px; margin:120px auto; padding:20px; border-radius:8px;">
+    <h3>Enter Quantity Needed</h3>
+    <input id="qty-input" type="number" step="0.1" placeholder="Enter amount e.g 2 or 2.5 buckets or liters" style="width:100%; padding:8px; margin-bottom:10px;">
+    <select id="unit-input" style="width:100%; padding:8px;">
+      <option value="liters">Liters</option>
+      <option value="buckets">Buckets</option>
+    </select>
+    <br><br>
+    <button class="btn" onclick="confirmQuantity()">Next → Select Color</button>
+    <button type="button" class="btn" onclick="closeQtyModal()" style="background:#ccc;">Cancel</button>
   </div>
 </div>
+
+<!-- ================= COLOR MODAL ================= -->
+<div id="color-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000;">
+  <div style="background:#fff; width:400px; margin:100px auto; padding:20px; border-radius:8px;">
+    
+    <h3 id="color-modal-title">Select Color</h3>
+
+    <input id="color-input" type="text" placeholder="Enter color (e.g red, sky blue, #ff0000)" 
+           style="width:100%; padding:8px; margin-bottom:10px;">
+
+    <div id="color-suggestions"></div>
+
+    <br>
+    <button id="confirm-color-btn" class="btn">Add to Cart</button>
+    <button class="btn" onclick="closeColorModal()" style="background:#ccc;">Cancel</button>
+
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+<script>
+let qtyProductId = null;
+
+function openQtyModal(pid){
+  qtyProductId = pid;
+  document.getElementById("qty-modal").style.display = "block";
+}
+
+function closeQtyModal(){
+  document.getElementById("qty-modal").style.display = "none";
+}
+
+function confirmQuantity(){
+  console.log("confirmQuantity clicked");
+  const qty  = parseFloat(document.getElementById("qty-input").value);
+  const unit = document.getElementById("unit-input").value;
+
+  if(!qty || qty <= 0){
+    alert("Enter valid quantity");
+    return;
+  }
+
+  window.selectedQty = qty;
+  window.selectedUnit = unit;
+  window.selectedProductId = qtyProductId;
+
+  // Instead of closing modal first:
+  if(typeof openColorModal === "function"){
+      openColorModal(qtyProductId, "Select Color");
+      closeQtyModal();  // close after calling main.js
+  } else {
+      console.error("main.js is not loaded or openColorModal is undefined");
+  }
+}
+</script>
 
 {% endblock %}

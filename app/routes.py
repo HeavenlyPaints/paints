@@ -25,6 +25,7 @@ from flask import current_app
 from flask import Blueprint, render_template, current_app, request, redirect, url_for, flash, jsonify, send_from_directory, session
 from werkzeug.utils import secure_filename
 from . import db, login_manager
+from .models import Coupon
 from .models import Admin, Product, Order, Referer, Withdrawal, Rating
 from .forms import AdminLoginForm, ProductForm, RefererApplyForm, CheckoutForm, WithdrawalForm, ChangeAdminForm
 from .utils import initialize_paystack, verify_paystack_transaction, validate_paystack_webhook, send_email
@@ -161,26 +162,65 @@ def _save_cart(cart):
 def cart_add():
     payload = request.get_json(force=True)
     pid = int(payload.get("product_id"))
-    qty = int(payload.get("qty", 1))
+    
+    try:
+        qty = float(payload.get("qty", 1.0))
+    except ValueError:
+        qty = 1.0
+
     color_name = payload.get("color_name")
     color_hex = payload.get("color_hex")
+    unit = payload.get("unit", "buckets").lower()
     
     p = Product.query.get_or_404(pid)
     cart = _get_cart()
 
-    cart.append({
-    "product_id": pid,
-    "name": p.name,
-    "price": p.price,
-    "qty": qty,
-    "color_name": color_name,
-    "color_hex": color_hex
-})
+    if unit == "liters":
 
+        calculated_price = float(p.price) / 20.0
+    else:
+
+        calculated_price = float(p.price)
+
+    cart.append({
+        "product_id": pid,
+        "name": p.name,
+        "price": calculated_price,
+        "qty": qty,
+        "unit": unit,
+        "color_name": color_name,
+        "color_hex": color_hex
+    })
 
     _save_cart(cart)
     return jsonify({"status": True, "cart": cart})
 
+
+
+@bp.route('/cart/apply-coupon', methods=['POST'])
+def apply_coupon():
+    payload = request.get_json(force=True)
+    code = payload.get('code', '').upper().strip()
+    coupon = Coupon.query.filter_by(code=code, is_active=True).first()
+
+    if not coupon:
+        session.pop('applied_coupon', None)
+        return jsonify({
+            "status": False, 
+            "message": "Invalid or inactive coupon code."
+        })
+
+    session['applied_coupon'] = {
+        "code": coupon.code,
+        "discount_pct": coupon.discount_pct
+    }
+    session.modified = True
+
+    return jsonify({
+        "status": True,
+        "message": f"Success! {coupon.discount_pct}% discount applied.",
+        "discount_pct": coupon.discount_pct
+    })
 
 
 @bp.route("/cart/remove", methods=["POST"])
@@ -201,12 +241,19 @@ def cart_remove():
 @bp.route("/cart/clear", methods=["POST"])
 def cart_clear():
     session['cart'] = []
+    session.pop('applied_coupon', None) 
     return jsonify({"status": True, "cart": []})
 
 
 @bp.route("/cart")
 def cart_view():
-    return jsonify({"cart": _get_cart()})
+    cart = _get_cart()
+    applied_coupon = session.get('applied_coupon')
+    discount_pct = applied_coupon.get('discount_pct', 0) if applied_coupon else 0
+    return jsonify({
+        "cart": cart,
+        "discount_pct": discount_pct 
+    })
 
 
 @bp.route("/checkout", methods=["GET", "POST"])
@@ -219,11 +266,18 @@ def checkout():
         return redirect(url_for("main.index"))
 
     amount = sum(it["price"] * it["qty"] for it in cart)
+
+    applied_coupon = session.get('applied_coupon')
+    if applied_coupon:
+        discount_pct = applied_coupon.get('discount_pct', 0)
+        
+        discount_amount = amount * (discount_pct / 100.0)
+        
+        amount = amount - discount_amount
     amount_kobo = int(amount * 100)
 
     if form.validate_on_submit():
         reference = uuid.uuid4().hex
-
         ref_token = session.get("ref_token")
 
         order = Order(
@@ -279,6 +333,10 @@ def paystack_callback():
         flash("Order not found", "danger")
         return redirect(url_for("main.index"))
 
+    if order.paid:
+        flash("Order already processed", "info")
+        return redirect(url_for("main.index"))
+
     order.paid = True
 
     if not order.pickup_code:
@@ -296,30 +354,31 @@ def paystack_callback():
             order_item = OrderItem(
                 order_id=order.id,
                 product_id=product.id,
-                quantity=item["qty"]
+		unit=item.get("unit"),
+                quantity=item["qty"],
+                color_name=item.get("color_name"),
+                color_hex=item.get("color_hex")
             )
 
             db.session.add(order_item)
 
-    session["cart"] = []
-
-
-    if order.ref_token:
-        referrer = Referer.query.filter_by(token=order.ref_token, status="approved").first()
-        if referrer:
-            earn = int(order.amount * 0.09)
-            referrer.earnings += earn
-            referrer.referrals_count += 1
-            db.session.commit()
-            badge, pct = badge_for_count(referrer.referrals_count)
-            if badge:
-                send_email(
-                    "Badge achieved",
-                    [referrer.email or current_app.config.get('MAIL_USERNAME')],
-                    f"<p>Congrats {referrer.name}, you earned {badge} badge ({pct}%)</p>"
-                )
-
     db.session.commit()
+
+
+    session["cart"] = []
+    session.pop("applied_coupon", None)
+
+    referrer = None
+    if order.ref_token:
+        referrer = Referer.query.filter_by(
+            token=order.ref_token,
+            status="approved"
+        ).first()
+
+    if referrer:
+        earn = int(order.amount * 0.07)
+        referrer.earnings += earn
+        db.session.commit()
 
     send_email(
         "Order successful",
@@ -331,10 +390,22 @@ def paystack_callback():
         """
     )
 
+    items_html = ""
+    for item in cart:
+        items_html += f"""
+        <p>
+            {item.get('name')} - Qty: {item.get('qty')}<br>
+            Color: {item.get('color_name')} ({item.get('color_hex')})
+        </p>
+        """
+
     send_email(
         "New order received",
         [current_app.config.get("MAIL_USERNAME")],
-        f"<p>Order {order.reference} placed.</p>"
+        f"""
+        <p>Order {order.reference} placed.</p>
+        {items_html}
+        """
     )
 
     flash("Payment confirmed. Order placed.", "success")
@@ -359,6 +430,80 @@ def paystack_webhook():
 def generate_pickup_code(length=7):
     """Generate a unique alphanumeric pickup code"""
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+
+
+
+@bp.route("/admin/order/manual", methods=["GET", "POST"])
+@login_required
+def admin_manual_order():
+    if current_user.username != "admin":
+        flash("Access denied!", "danger")
+        return redirect(url_for("main.index"))
+
+    if request.method == "POST":
+        customer_name = request.form.get("name", "Walk-in Customer")
+        customer_phone = request.form.get("phone", "N/A")
+        customer_email = request.form.get("email", "cash@heavenlypaint.com")
+        
+        product_id = request.form.get("product_id")
+        unit = request.form.get("unit", "buckets").lower()
+        color_name = request.form.get("color_name", "Standard")
+        color_hex = request.form.get("color_hex", "")
+        
+        try:
+            qty = float(request.form.get("qty", 1.0))
+        except ValueError:
+            qty = 1.0
+
+        product = Product.query.get(product_id)
+        if not product:
+            flash("Invalid product selected.", "danger")
+            return redirect(request.url)
+
+        if unit == "liters":
+            price_per_unit = float(product.price) / 20.0
+        else:
+            price_per_unit = float(product.price)
+            
+        total_amount = price_per_unit * qty
+        reference = f"HPL-{uuid.uuid4().hex[:8].upper()}"
+        unique_pickup = f"WALK-{uuid.uuid4().hex[:6].upper()}"
+
+        order = Order(
+            reference=reference,
+            name=customer_name,
+            email=customer_email,
+            phone=customer_phone,
+            amount=total_amount,
+            paid=True,           
+            delivered=True,      
+            pickup_code=unique_pickup, 
+            pickup_expired=True  
+        )
+
+        db.session.add(order)
+        db.session.commit()
+        order_item = OrderItem(
+            order_id=order.id,
+            product_id=product.id,
+            unit=unit,
+            quantity=qty,
+            color_name=color_name,
+            color_hex=color_hex,
+            collected_quantity=qty
+        )
+        
+        product.sold += qty
+        product.delivered += qty
+        db.session.add(order_item)
+        db.session.commit()
+
+        flash(f"Manual cash sale recorded successfully! Reference: {reference}", "success")
+        return redirect(url_for("main.admin_orders"))
+
+    products = Product.query.order_by(Product.name).all()
+    return render_template("admin/manual_order.html", products=products)
+
 
 
 @bp.route('/apply-referer', methods=['GET', 'POST'])
@@ -474,7 +619,8 @@ def referer_dashboard(token):
     if referer.status != "approved":
         return redirect(url_for("main.referer_pending", token=referer.token))
 
-    badge, pct = badge_for_count(referer.referrals_count)
+    badge = None
+    pct = 0
 
     total_withdrawn = db.session.query(func.sum(Withdrawal.amount))\
         .filter_by(referer_id=referer.id, status="paid").scalar() or 0
@@ -713,7 +859,6 @@ def admin_dashboard():
         flash("Access denied!", "danger")
         return redirect(url_for('main.index'))
 
-
     products = Product.query.all()
 
     pending_referers = Referer.query.filter_by(status="pending").all()
@@ -735,6 +880,10 @@ def admin_dashboard():
     monthly_earnings = int(monthly_sum)
     orders_count = Order.query.count()
     referrers_count = Referer.query.count()
+    pending_staff_count = Staff.query.filter_by(verification_status="pending").count()
+    pending_withdrawals_count = Withdrawal.query.filter_by(status="pending").count()
+    pending_orders_count = Order.query.filter_by(paid=True, delivered=False).count()
+    pending_referers_count = len(pending_referers)
 
     return render_template(
         "admin/dashboard.html",
@@ -745,7 +894,11 @@ def admin_dashboard():
         orders=orders,
         monthly_earnings=monthly_earnings,
         orders_count=orders_count,
-        referrers_count=referrers_count
+        referrers_count=referrers_count,
+        pending_staff_count=pending_staff_count,
+        pending_withdrawals_count=pending_withdrawals_count,
+        pending_orders_count=pending_orders_count,
+        pending_referers_count=pending_referers_count
     )
 
 
@@ -834,10 +987,6 @@ def admin_pay_withdrawal(id):
     return redirect(url_for("main.admin_withdrawals_view"))
 
 
-
-
-
-
 @bp.route("/uploads/<filename>")
 def uploaded_file(filename):
     upload_folder = os.path.abspath(current_app.config['UPLOAD_FOLDER'])
@@ -850,14 +999,6 @@ def uploaded_file(filename):
     return send_from_directory(upload_folder, filename)
 
 
-
-def badge_for_count(count):
-    if count >= 25: return ("Sapphire", 15)
-    if count >= 20: return ("Platinum", 13)
-    if count >= 15: return ("Gold", 12)
-    if count >= 10: return ("Silver", 11)
-    if count >= 5: return ("Wood", 10)
-    return (None, 9)
 
 
 @bp.route("/about")
@@ -980,25 +1121,24 @@ def admin_toggle_delivered(order_id):
     return redirect(url_for("main.admin_orders"))
 
 
-@bp.route("/admin/order/<int:order_id>/toggle_terminated", methods=["POST"])
+@bp.route("/admin/order/<int:order_id>/delete", methods=["POST"])
 @login_required
-def admin_toggle_terminated(order_id):
+def admin_delete_order(order_id):
     if current_user.username != "admin":
         flash("Access denied!", "danger")
         return redirect(url_for("main.index"))
 
     order = Order.query.get_or_404(order_id)
 
-    if order.delivered and not order.terminated:
-        flash("Cannot terminate a delivered order.", "danger")
-        return redirect(url_for("main.admin_order_view", order_id=order_id))
 
-    order.terminated = not order.terminated
+    for item in order.order_items:
+        db.session.delete(item)
+
+    db.session.delete(order)
     db.session.commit()
 
-    flash(f"Order marked as {'terminated' if order.terminated else 'not terminated'}.", "warning")
+    flash("Order permanently deleted from the database.", "success")
     return redirect(url_for("main.admin_orders"))
-
 
 
 @bp.route("/payment_confirmation/<reference>")
@@ -1164,10 +1304,6 @@ def staff_forgot_password():
 
     return render_template('staff/forgot_password.html')
 
-
-
-
-
 @bp.route('/staff/reset-password/<token>', methods=['GET', 'POST'])
 def staff_reset_password(token):
     staff = Staff.query.filter_by(reset_token=token).first()
@@ -1232,8 +1368,13 @@ def verify_staff(id):
 @bp.route('/admin/decline/<int:id>', methods=['POST'])
 def decline_staff(id):
     staff = Staff.query.get_or_404(id)
+    
+    reason = request.form.get('reason')
+    
     staff.verification_status = 'declined'
     staff.verified = False
+    staff.rejection_reason = reason
+    
     db.session.commit()
     flash(f"{staff.name} has been declined.", "warning")
     return redirect(url_for('main.staff_verification'))
@@ -1355,8 +1496,6 @@ def sales_dashboard():
     )
 
 
-
-
 @bp.route('/staff/product/add', methods=['GET','POST'])
 def staff_add_product():
     staff = staff_required(role="sales")
@@ -1416,12 +1555,8 @@ def staff_edit_product(id):
 
 
 @bp.route('/staff/product/delete/<int:id>', methods=['POST'])
-@login_required
 def staff_delete_product(id):
-    staff = current_user
-
-    if not hasattr(staff, "role") or staff.role != 'Sales':
-        abort(403)
+    staff = staff_required(role="sales")
 
     product = Product.query.get_or_404(id)
 
@@ -1437,32 +1572,24 @@ def staff_delete_product(id):
     return redirect(url_for('main.sales_dashboard'))
 
 
-
 @bp.route('/staff/order/<int:order_id>/toggle_shipped', methods=['POST'])
 def staff_toggle_shipped(order_id):
-    staff = current_user
-
-    if staff.role != 'Sales':
-        abort(403)
-
+    staff = staff_required(role="sales")
     order = Order.query.get_or_404(order_id)
 
     if not order.paid:
         flash("Order not paid yet.", "warning")
         return redirect(url_for('main.sales_dashboard'))
 
-    order.delivered = not order.delivered
+    if order.delivered:
+        flash("This order has already been shipped and cannot be undone.", "warning")
+        return redirect(url_for('main.sales_dashboard'))
+
+    order.delivered = True
     db.session.commit()
 
-    flash(
-        f"Order marked as {'shipped' if order.delivered else 'not shipped'}",
-        "success"
-    )
+    flash("Order successfully marked as shipped.", "success")
     return redirect(url_for('main.sales_dashboard'))
-
-
-
-
 
 
 def staff_required(role=None):
@@ -1510,3 +1637,168 @@ def download_documents(staff_id):
 def signup():
     banks = Bank.query.order_by(Bank.name).all()
     return render_template('signup.html', banks=banks)
+
+
+@bp.route('/admin/coupons', methods=['GET', 'POST'])
+@login_required
+def admin_coupons():
+    if current_user.username != 'admin':
+        flash("Access denied.", "danger")
+        return redirect(url_for('main.index'))
+    
+    if request.method == 'POST':
+        code = request.form.get('code', '').upper().strip()
+        try:
+            discount = float(request.form.get('discount_pct', 0))
+        except ValueError:
+            discount = 0.0
+            
+        if not code or discount <= 0:
+            flash("Please enter a valid code and a discount greater than 0.", "error")
+            return redirect(url_for('main.admin_coupons'))
+
+        if Coupon.query.filter_by(code=code).first():
+            flash("That coupon code already exists!", "error")
+        else:
+            new_coupon = Coupon(code=code, discount_pct=discount)
+            db.session.add(new_coupon)
+            db.session.commit()
+            flash(f"Coupon {code} created successfully for {discount}% off!", "success")
+            
+        return redirect(url_for('main.admin_coupons'))
+        
+    coupons = Coupon.query.order_by(Coupon.created_at.desc()).all()
+    return render_template('admin/coupons.html', coupons=coupons)
+
+
+@bp.route('/admin/coupons/toggle/<int:id>', methods=['POST'])
+@login_required
+def toggle_coupon(id):
+    if current_user.username != 'admin':
+        return redirect(url_for('main.index'))
+        
+    coupon = Coupon.query.get_or_404(id)
+    coupon.is_active = not coupon.is_active
+    db.session.commit()
+    status = "activated" if coupon.is_active else "deactivated"
+    flash(f"Coupon {coupon.code} has been {status}.", "success")
+    return redirect(url_for('main.admin_coupons'))
+
+
+@bp.route('/admin/coupons/delete/<int:id>', methods=['POST'])
+@login_required
+def delete_coupon(id):
+    if current_user.username != 'admin':
+        return redirect(url_for('main.index'))
+        
+    coupon = Coupon.query.get_or_404(id)
+    db.session.delete(coupon)
+    db.session.commit()
+    flash("Coupon permanently deleted.", "success")
+    return redirect(url_for('main.admin_coupons'))
+
+@bp.route("/admin/export/staffs")
+@login_required
+def export_staffs():
+    if current_user.username != 'admin':
+        flash("Access denied!", "danger")
+        return redirect(url_for('main.index'))
+
+    staffs = Staff.query.all()
+    si = io.StringIO()
+    cw = csv.writer(si)
+
+    column_names = [col.name for col in Staff.__table__.columns]
+    
+    clean_headers = [col.replace('_', ' ').title() for col in column_names]
+    cw.writerow(clean_headers)
+
+    for s in staffs:
+        row_data = [getattr(s, col) for col in column_names]
+        cw.writerow(row_data)
+
+    output = si.getvalue()
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=hpl_staff_complete_backup.csv"}
+    )
+
+
+@bp.route("/admin/export/referrers")
+@login_required
+def export_referrers():
+    if current_user.username != 'admin':
+        flash("Access denied!", "danger")
+        return redirect(url_for('main.index'))
+
+    referrers = Referer.query.all()
+    si = io.StringIO()
+    cw = csv.writer(si)
+
+    column_names = [col.name for col in Referer.__table__.columns]
+    
+    clean_headers = [col.replace('_', ' ').title() for col in column_names]
+    cw.writerow(clean_headers)
+
+    for r in referrers:
+        row_data = [getattr(r, col) for col in column_names]
+        cw.writerow(row_data)
+
+    output = si.getvalue()
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=hpl_referrers_complete_backup.csv"}
+    )
+
+
+@bp.route('/staff/reapply', methods=['GET', 'POST'])
+def staff_reapply():
+    if 'staff_id' not in session:
+        flash("Please log in first.")
+        return redirect(url_for('main.staff_login'))
+
+    staff = Staff.query.get_or_404(session['staff_id'])
+
+    if staff.verification_status != 'declined':
+        return redirect(url_for('main.staff_dashboard'))
+
+    if request.method == 'POST':
+        if 'documents' in request.files:
+            files = request.files.getlist('documents')
+            saved_docs = []
+
+            upload_dir = os.path.join(current_app.static_folder, "documents")
+            os.makedirs(upload_dir, exist_ok=True)
+
+            for file in files:
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    rel_path = f"documents/{filename}"
+                    abs_path = os.path.join(current_app.static_folder, rel_path)
+                    file.save(abs_path)
+                    saved_docs.append(rel_path)
+
+            if saved_docs:
+                new_docs_str = ",".join(saved_docs)
+                if staff.documents:
+                    staff.documents += "," + new_docs_str
+                else:
+                    staff.documents = new_docs_str
+
+        staff.verification_status = 'pending'
+        db.session.commit()
+
+        flash("Your application has been updated and re-submitted for review!", "success")
+        return redirect(url_for('main.staff_dashboard'))
+
+    return render_template('staff/reapply.html', staff=staff)
+
+
+@bp.route("/receipt/<reference>")
+def view_receipt(reference):
+
+    order = Order.query.filter_by(reference=reference).first_or_404()
+
+    return render_template("receipt.html", order=order)

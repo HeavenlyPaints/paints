@@ -1,40 +1,95 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2>Admin Dashboard</h2>
+<style>
+/* CSS for the floating red notification bubbles */
+.notify-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: #dc3545; /* Bootstrap Red */
+    color: white;
+    border-radius: 50%;
+    padding: 3px 7px;
+    font-size: 12px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    z-index: 10;
+}
+/* Ensure buttons act as an anchor for the absolute badge */
+.btn-relative {
+    position: relative;
+    display: inline-block;
+    text-decoration: none;
+}
+</style>
 
+<h2>Admin Dashboard</h2>
 
 <form action="{{ url_for('main.admin_logout') }}" method="GET">
     <button type="submit" class="btn">Logout</button>
 </form>
 
-
-
-
-<div class="admin-stats">
+<div class="admin-stats" style="margin-top: 20px;">
     <div><strong>Monthly Earnings:</strong> ₦{{ "{:,.2f}".format(monthly_earnings) }}</div><br>
     <div><strong>Total Orders:</strong> {{ orders_count }}</div><br>
     <div><strong>Total Referrers:</strong> {{ referrers_count }}</div><br>
 </div>
 
-<div class="admin-actions">
-    <a class="btn btn-primary" style="text-decoration:none" href="{{ url_for('main.add_product') }}">Add Product</a>
-    <a class="btn btn-info" style="text-decoration:none" href="{{ url_for('main.referer_requests') }}">Pending Referrer Requests</a>
-    <a class="btn btn-warning" style="text-decoration:none" href="{{ url_for('main.admin_withdrawals_view') }}">Withdrawals</a>
-    <a class="btn btn-primary" style="text-decoration:none"  href="{{ url_for('main.staff_verification') }}">Verify Staffs</a>
-    <a class="btn btn-success" style="text-decoration:none" href="{{ url_for('main.admin_orders') }}">Manage Orders</a>
-    <a class="btn btn-primary" style="text-decoration:none" href="{{ url_for('main.verify_pickup_page') }}">Verify Pickup Code</a>
-<div id="pickupModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
-    background:rgba(0,0,0,0.5); justify-content:center; align-items:center;">
+<div class="admin-actions" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 20px;">
+    
+    <a class="btn btn-primary btn-relative" href="{{ url_for('main.add_product') }}">Add Product</a>
+    
+    <a class="btn btn-info btn-relative" href="{{ url_for('main.referer_requests') }}">
+        Pending Referrer Requests
+        {% if pending_referers_count > 0 %}
+            <span class="notify-badge">{{ pending_referers_count }}</span>
+        {% endif %}
+    </a>
+    
+    <a class="btn btn-warning btn-relative" href="{{ url_for('main.admin_withdrawals_view') }}">
+        Withdrawals
+        {% if pending_withdrawals_count > 0 %}
+            <span class="notify-badge">{{ pending_withdrawals_count }}</span>
+        {% endif %}
+    </a>
+    
+    <a class="btn btn-primary btn-relative" href="{{ url_for('main.staff_verification') }}">
+        Verify Staffs
+        {% if pending_staff_count > 0 %}
+            <span class="notify-badge">{{ pending_staff_count }}</span>
+        {% endif %}
+    </a>
+    
+    <a class="btn btn-primary btn-relative" href="{{ url_for('main.admin_manual_order') }}">Manual Sales</a>
+    
+    <a class="btn btn-success btn-relative" href="{{ url_for('main.admin_orders') }}">
+        Manage Orders
+        {% if pending_orders_count > 0 %}
+            <span class="notify-badge">{{ pending_orders_count }}</span>
+        {% endif %}
+    </a>
+    
+    <a class="btn btn-success btn-relative" href="{{ url_for('main.admin_coupons') }}">Manage Coupons</a>
+    
+    <a class="btn btn-primary btn-relative" href="{{ url_for('main.verify_pickup_page') }}">Verify Pickup Code</a>
+
+    <a class="btn btn-secondary btn-relative" style="background-color: #6c757d; color: white;" href="{{ url_for('main.export_staffs') }}">
+        📥 Backup Staff Data
+    </a>
+    
+    <a class="btn btn-secondary btn-relative" style="background-color: #6c757d; color: white;" href="{{ url_for('main.export_referrers') }}">
+        📥 Backup Referrer Data
+    </a>
+</div>
+
+<div id="pickupModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index: 9999;">
     <div style="background:white; padding:20px; border-radius:10px; text-align:center; width:300px;">
         <h3>Your Pickup Code</h3>
         <p id="pickupCodeText" style="font-weight:bold; font-size:20px;"></p>
         <button id="copyPickupCode" class="btn btn-primary">Copy Code</button>
         <button onclick="document.getElementById('pickupModal').style.display='none'" class="btn btn-secondary">Close</button>
     </div>
-</div>
-
-
 </div>
 
 <hr>
@@ -171,8 +226,7 @@
 <p>No recent orders.</p>
 {% endif %}
 
-
-// After payment success, call this function
+<script>
 function showPickupCode(code) {
     document.getElementById("pickupCodeText").innerText = code;
     document.getElementById("pickupModal").style.display = "flex";
@@ -182,6 +236,5 @@ function showPickupCode(code) {
             .then(() => alert("Pickup code copied!"));
     };
 }
-
+</script>
 {% endblock %}
-

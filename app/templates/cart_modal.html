@@ -1,29 +1,27 @@
-<div id="cart-modal" class="modal">
+<div id="cart-modal" class="modal" style="display:none;">
   <div class="modal-content">
-    <span class="close-btn" onclick="closeCart()" style="width:10px; height:10px;">×</span>
+    <span class="close-btn" onclick="closeCart()" style="width:20px; height:20px; cursor:pointer; float: right; font-size: 20px;">×</span>
     <h3>Your Cart</h3>
 
-    <ul id="cart-items"></ul>
+    <ul id="cart-items" style="list-style-type: none; padding-left: 0; max-height: 40vh; overflow-y: auto;"></ul>
 
-    <p id="cart-total">Total: ₦0</p>
-
-    <div class="cart-actions">
-      <button class="btn" onclick="proceedToCheckout()">Checkout</button>
-      <button class="btn" onclick="clearCart()" style="background:red;">Clear Cart</button>
+    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+      <label style="font-weight: bold; font-size: 0.9em; display: block; margin-bottom: 5px;">Promo Code</label>
+      <div style="display: flex; gap: 10px;">
+        <input type="text" id="coupon-input" placeholder="Enter code here" style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; text-transform: uppercase;">
+        <button type="button" onclick="applyCoupon()" class="btn" style="background-color: #333; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer;">Apply</button>
+      </div>
+      <p id="coupon-message" style="margin-top: 5px; font-size: 0.85em; font-weight: bold;"></p>
     </div>
-  </div>
-<div id="cart-modal" class="modal">
-  <div class="modal-content">
-    <span class="close-btn" onclick="closeCart()" style="width:10px; height:10px;">×</span>
-    <h3>Your Cart</h3>
 
-    <ul id="cart-items"></ul>
+    <div style="margin-top: 15px; text-align: right;">
+      <p id="cart-total" style="font-size: 1.1em; font-weight: bold; margin: 0;">Total: ₦0</p>
+      <p id="discount-display" style="color: #28a745; font-weight: bold; margin: 5px 0 0 0; display: none;">Discount Applied: 0% OFF</p>
+    </div>
 
-    <p id="cart-total">Total: ₦0</p>
-
-    <div class="cart-actions">
-      <button class="btn" onclick="proceedToCheckout()">Checkout</button>
-      <button class="btn" onclick="clearCart()" style="background:red;">Clear Cart</button>
+    <div class="cart-actions" style="display: flex; gap: 10px; margin-top: 20px;">
+      <button class="btn" onclick="proceedToCheckout()" style="background-color: #28a745; color: white; flex: 1; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-size: 1em;">Checkout</button>
+      <button class="btn" onclick="clearCart()" style="background-color: #dc3545; color: white; flex: 1; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-size: 1em;">Clear Cart</button>
     </div>
   </div>
 </div>
@@ -40,35 +38,108 @@
     transition: 0.3s ease;
     z-index: 9999;
     font-size: 14px;
+    pointer-events: none;
 "></div>
-
-</div>
-
-<div id="toast" style="
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #222;
-    color: #fff;
-    padding: 12px 18px;
-    border-radius: 6px;
-    opacity: 0;
-    transition: 0.3s ease;
-    z-index: 9999;
-    font-size: 14px;
-"></div>
-
 
 <div id="color-modal" class="modal" style="display:none;">
   <div class="modal-content">
-    <span class="close-btn" onclick="closeColorModal()">×</span>
+    <span class="close-btn" onclick="closeColorModal()" style="cursor:pointer; float: right; font-size: 20px;">×</span>
     <h3>Select Color for Product</h3>
-    <p id="color-product-name"></p>
+    <p id="color-product-name" style="font-weight:bold; margin-bottom: 10px;"></p>
 
-    <input type="text" id="color-input" placeholder="Type color name..." autocomplete="off"/>
+    <input type="text" id="color-input" placeholder="Type color name..." autocomplete="off" style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"/>
 
-    <div id="color-suggestions" style="display:flex; gap:10px; flex-wrap: wrap; margin-top:10px;"></div>
+    <div id="color-suggestions" style="display:flex; gap:10px; flex-wrap: wrap; margin-bottom: 15px;"></div>
 
-    <button class="btn" id="confirm-color-btn">Add to Cart</button>
+    <button class="btn" id="confirm-color-btn" style="background-color: #007bff; color: white; width: 100%; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">Add to Cart</button>
   </div>
 </div>
+
+<script>
+  window.currentDiscountPct = 0;
+
+  function applyCoupon() {
+      const codeInput = document.getElementById('coupon-input').value;
+      const msgBox = document.getElementById('coupon-message');
+      const discountDisplay = document.getElementById('discount-display');
+      const cartTotalElement = document.getElementById('cart-total');
+
+      if (!codeInput) {
+          msgBox.style.color = "red";
+          msgBox.innerText = "Please enter a code.";
+          return;
+      }
+
+      // 1. Verify the coupon with the server
+      fetch('/cart/apply-coupon', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: codeInput })
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.status) {
+              // Success! Save discount
+              msgBox.style.color = "green";
+              msgBox.innerText = data.message;
+              window.currentDiscountPct = data.discount_pct;
+              
+              discountDisplay.style.display = "block";
+              discountDisplay.innerText = "Discount Applied: " + data.discount_pct + "% OFF";
+
+              // 2. Fetch the cart to do the exact math and update the UI
+              recalculateCartTotalUI();
+
+          } else {
+              // Failed / Invalid Code
+              msgBox.style.color = "red";
+              msgBox.innerText = data.message;
+              window.currentDiscountPct = 0;
+              discountDisplay.style.display = "none";
+              recalculateCartTotalUI(); // Reset to normal price
+          }
+      })
+      .catch(err => {
+          console.error("Coupon error:", err);
+          msgBox.style.color = "red";
+          msgBox.innerText = "Error connecting to server.";
+      });
+  }
+
+  // A helper function to fetch the cart and re-draw the total price
+  function recalculateCartTotalUI() {
+      fetch('/cart')
+      .then(res => res.json())
+      .then(data => {
+          let subtotal = 0;
+          data.cart.forEach(item => {
+              subtotal += (item.price * item.qty);
+          });
+
+          // THE FIX: Always trust the backend's memory over the frontend's!
+          window.currentDiscountPct = data.discount_pct || 0;
+
+          const cartTotalElement = document.getElementById('cart-total');
+          const discountDisplay = document.getElementById('discount-display');
+
+          if (window.currentDiscountPct > 0) {
+              // Calculate the new discounted price
+              let discountAmount = subtotal * (window.currentDiscountPct / 100);
+              let newTotal = subtotal - discountAmount;
+              
+              cartTotalElement.innerHTML = `Total: <span style="text-decoration: line-through; color: #999; font-size: 0.85em;">₦${subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span> <span style="color: #28a745; font-size: 1.2em;">₦${newTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>`;
+              
+              // Force the green discount text to show up
+              discountDisplay.style.display = "block";
+              discountDisplay.innerText = "Discount Applied: " + window.currentDiscountPct + "% OFF";
+          } else {
+              // Standard display if no coupon is active
+              cartTotalElement.innerHTML = `Total: ₦${subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+              
+              // Hide the green text
+              discountDisplay.style.display = "none";
+          }
+      })
+      .catch(err => console.error("Error recalculating cart:", err));
+  }
+</script>
