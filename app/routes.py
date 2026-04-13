@@ -78,7 +78,14 @@ def index():
         paystack_public=current_app.config.get("PAYSTACK_PUBLIC"),
         current_year=datetime.now().year
     )
-
+@bp.route('/force-upgrade-db')
+def force_upgrade_db():
+    from flask_migrate import upgrade
+    try:
+        upgrade()
+        return "Database upgraded successfully! You can now log in."
+    except Exception as e:
+        return f"Error upgrading database: {str(e)}"
 
 def staff_required(role=None):
     def decorator(f):
