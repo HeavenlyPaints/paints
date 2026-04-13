@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "staff_base.html" %}
 {% block content %}
 
 <div class="dashboard-wrapper">
@@ -52,9 +52,13 @@
   {% elif staff.verification_status == 'approved' %}
     <div class="dashboard-approved">
 
-      <div class="profile-box">
+      <div class="profile-box" style="text-align: center; margin-bottom: 20px;">
         {% if staff.profile_image %}
-          <img src="{{ url_for('static', filename=staff.profile_image) }}" alt="Profile">
+            <img src="{% if staff.profile_image.startswith('data:') %}{{ staff.profile_image }}{% else %}{{ url_for('static', filename=staff.profile_image) }}{% endif %}" 
+                 style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #007bff;">
+        {% else %}
+            <img src="{{ url_for('static', filename='default_avatar.png') }}" 
+                 style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #ccc;">
         {% endif %}
       </div>
 
@@ -66,13 +70,25 @@
         <p><strong>Staff ID:</strong> {{ staff.staff_id }}</p>
         <p><strong>Role:</strong> {{ staff.role }}</p>
 
-        <a href="{{ url_for('main.staff_work') }}">
-          <button class="btn">Go to Work Area</button>
-        </a>
+        <div style="display: flex; flex-direction: column; gap: 10px; max-width: 250px; margin: 25px auto 0;">
+            
+            <a href="{{ url_for('main.staff_work') }}" style="text-decoration: none;">
+                <button class="btn" style="width: 100%;">Go to Work Area</button>
+            </a>
 
-        <form method="POST" action="{{ url_for('main.staff_logout') }}">
-          <button class="btn danger">Logout</button>
-        </form>
+            <a href="{{ url_for('main.staff_profile') }}" style="text-decoration: none;">
+                <button class="btn" style="width: 100%; background-color: #17a2b8; color: white;">
+                    <i class="fa-solid fa-user-gear"></i> Manage Profile
+                </button>
+            </a>
+            <a href="{{ url_for('main.staff_tasks') }}" style="display: block; width: 100%; box-sizing: border-box; background-color: #28a745; color: white; margin-bottom: 10px; text-align: center; padding: 12px; text-decoration: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
+    <i class="fa-solid fa-clipboard-check"></i> Open Task Board
+</a>
+            <form method="POST" action="{{ url_for('main.staff_logout') }}" style="width: 100%;">
+                <button class="btn danger" style="width: 100%;">Logout</button>
+            </form>
+            
+        </div>
       </div>
 
     </div>

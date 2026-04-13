@@ -1,9 +1,53 @@
 {% extends "base.html" %}
 {% block content %}
+{% set settings = SiteSettings.query.first() %}
+{% if settings and settings.hiring_mode %}
+<style>
+    .hiring-marquee-container {
+        width: 100%;
+        overflow: hidden;
+        background-color: #28a745; /* Heavenly Paint Green */
+        padding: 12px 0;
+        position: relative;
+        white-space: nowrap;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .hiring-marquee-text {
+        display: inline-block;
+        padding-left: 100%; /* Start completely off-screen to the right */
+        animation: marquee 20s linear infinite; /* 20 seconds makes it readable */
+    }
+    .hiring-marquee-text:hover {
+        animation-play-state: paused; /* Pauses when they hover so they can click */
+    }
+    .hiring-marquee-text a {
+        color: white;
+        font-weight: bold;
+        font-size: 1.1em;
+        text-decoration: none;
+        letter-spacing: 1px;
+    }
+    .hiring-marquee-text a:hover {
+        text-decoration: underline;
+    }
+    @keyframes marquee {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-100%); } /* Slide entirely off-screen to the left */
+    }
+</style>
+
+<div class="hiring-marquee-container">
+    <div class="hiring-marquee-text">
+        <a href="{{ url_for('main.staff_signup') }}">
+            📢 We are currently hiring! Join the Heavenly Paint team. Click here to apply now! 🚀
+        </a>
+    </div>
+</div>
+{% endif %}
 
 <section class="hero">
   <h1>Welcome to Heavenly Paint Limited</h1>
-  <p>Color your world with <i>Shree</i></p>
+  <p>All Colors Starts with <i><b>You</b></i></p>
 </section>
 
 <section class="product-grid">

@@ -56,6 +56,10 @@ bp = Blueprint('main', __name__)
 def load_user(user_id):
     return Admin.query.get(int(user_id))
 
+@bp.context_processor
+def inject_site_settings():
+    from app.models import SiteSettings
+    return dict(SiteSettings=SiteSettings)
 
 @bp.route("/")
 def index():
@@ -194,8 +198,6 @@ def cart_add():
 
     _save_cart(cart)
     return jsonify({"status": True, "cart": cart})
-
-
 
 @bp.route('/cart/apply-coupon', methods=['POST'])
 def apply_coupon():
@@ -431,8 +433,6 @@ def generate_pickup_code(length=7):
     """Generate a unique alphanumeric pickup code"""
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
-
-
 @bp.route("/admin/order/manual", methods=["GET", "POST"])
 @login_required
 def admin_manual_order():
@@ -444,12 +444,11 @@ def admin_manual_order():
         customer_name = request.form.get("name", "Walk-in Customer")
         customer_phone = request.form.get("phone", "N/A")
         customer_email = request.form.get("email", "cash@heavenlypaint.com")
-        
         product_id = request.form.get("product_id")
         unit = request.form.get("unit", "buckets").lower()
         color_name = request.form.get("color_name", "Standard")
         color_hex = request.form.get("color_hex", "")
-        
+
         try:
             qty = float(request.form.get("qty", 1.0))
         except ValueError:
@@ -464,7 +463,7 @@ def admin_manual_order():
             price_per_unit = float(product.price) / 20.0
         else:
             price_per_unit = float(product.price)
-            
+
         total_amount = price_per_unit * qty
         reference = f"HPL-{uuid.uuid4().hex[:8].upper()}"
         unique_pickup = f"WALK-{uuid.uuid4().hex[:6].upper()}"
@@ -475,10 +474,10 @@ def admin_manual_order():
             email=customer_email,
             phone=customer_phone,
             amount=total_amount,
-            paid=True,           
-            delivered=True,      
-            pickup_code=unique_pickup, 
-            pickup_expired=True  
+            paid=True,
+            delivered=True,
+            pickup_code=unique_pickup,
+            pickup_expired=True
         )
 
         db.session.add(order)
@@ -492,7 +491,7 @@ def admin_manual_order():
             color_hex=color_hex,
             collected_quantity=qty
         )
-        
+
         product.sold += qty
         product.delivered += qty
         db.session.add(order_item)
@@ -549,9 +548,6 @@ def apply_referer():
     return render_template("apply_referer.html")
 
 
-
-
-
 @bp.route("/generate_link/<token>")
 def generate_link(token):
     r = Referer.query.filter_by(token=token, status="approved").first_or_404()
@@ -605,13 +601,6 @@ def referer_withdraw():
 
     return jsonify({"status": True, "message": "Withdrawal submitted"})
 
-
-@bp.route('/referer/pending/<token>')
-def referer_pending(token):
-    referer = Referer.query.filter_by(token=token).first_or_404()
-    return render_template("referer_pending.html", referer=referer)
-
-
 @bp.route("/referer/<token>/dashboard")
 def referer_dashboard(token):
     referer = Referer.query.filter_by(token=token).first_or_404()
@@ -648,9 +637,6 @@ def referer_dashboard(token):
     )
 
 
-
-
-
 @bp.route("/referer-login", methods=["GET", "POST"])
 def referer_login():
     if request.method == "POST":
@@ -662,17 +648,19 @@ def referer_login():
             flash("No account found with that WhatsApp number.", "danger")
             return redirect(url_for("main.referer_login"))
 
-        if referer.status == "pending":
+        if referer.status in ["pending", "rejected"]:
             return redirect(url_for("main.referer_pending", token=referer.token))
-        elif referer.status == "rejected":
-            flash("Your application was rejected.", "danger")
-            return redirect(url_for("main.referer_login"))
-
         return redirect(url_for("main.referer_dashboard", token=referer.token))
-
     return render_template("referer_login.html")
 
 
+@bp.route('/referer/pending/<token>')
+def referer_pending(token):
+    referer = Referer.query.filter_by(token=token).first_or_404()
+    if referer.status == 'approved':
+        flash("Your account has been approved! Please log in.", "success")
+        return redirect(url_for('main.referer_login'))
+    return render_template("referer_pending.html", referer=referer)
 
 
 @bp.route("/referer-logout")
@@ -694,6 +682,22 @@ def admin_approve_referer(id):
 
 
 
+@bp.route("/admin/referer/<int:id>/delete", methods=["POST"])
+@login_required
+def admin_delete_referer(id):
+    if current_user.username != 'admin':
+        flash("Access denied.", "danger")
+        return redirect(url_for('main.index'))
+
+    referer = Referer.query.get_or_404(id)
+    from app.models import Withdrawal
+    Withdrawal.query.filter_by(referer_id=referer.id).delete()
+
+    db.session.delete(referer)
+    db.session.commit()
+
+    flash(f"Referrer {referer.name} has been permanently deleted.", "success")
+    return redirect(request.referrer or url_for('main.admin_dashboard'))
 
 
 @bp.route("/admin/verify-pickup", methods=["POST"])
@@ -792,17 +796,10 @@ def collect_items():
         fully_collected=order.is_fully_collected
     )
 
-
-
-
 @bp.route("/staff/verify-pickup")
 @login_required
 def verify_pickup_page():
     return render_template("staff/sales/verify_pickup.html")
-
-
-
-
 
 @bp.route("/admin/referer/<int:id>/reject", methods=["POST"])
 @login_required
@@ -812,9 +809,6 @@ def admin_reject_referer(id):
     db.session.commit()
     flash(f"{referer.name} rejected.", "danger")
     return redirect(url_for("main.referer_requests"))
-
-
-
 
 @bp.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
@@ -832,10 +826,6 @@ def admin_login():
 
     return render_template("admin/login.html", form=form)
 
-
-
-
-
 @bp.route("/admin/logout")
 @login_required
 def admin_logout():
@@ -849,7 +839,6 @@ def add_no_cache_headers(response):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
-
 
 
 @bp.route("/admin/dashboard")
@@ -885,6 +874,27 @@ def admin_dashboard():
     pending_orders_count = Order.query.filter_by(paid=True, delivered=False).count()
     pending_referers_count = len(pending_referers)
 
+    chart_labels = []
+    chart_data = []
+    
+    today = datetime.utcnow().date()
+    sales_dict = {(today - timedelta(days=i)): 0.0 for i in range(6, -1, -1)}
+
+    seven_days_ago = today - timedelta(days=6)
+    recent_orders = Order.query.filter(
+        Order.paid == True, 
+        Order.created_at >= seven_days_ago
+    ).all()
+
+    for order in recent_orders:
+        order_date = order.created_at.date()
+        if order_date in sales_dict:
+            sales_dict[order_date] += float(order.amount)
+
+    for date_obj, total in sales_dict.items():
+        chart_labels.append(date_obj.strftime("%b %d"))
+        chart_data.append(total)
+
     return render_template(
         "admin/dashboard.html",
         products=products,
@@ -898,7 +908,9 @@ def admin_dashboard():
         pending_staff_count=pending_staff_count,
         pending_withdrawals_count=pending_withdrawals_count,
         pending_orders_count=pending_orders_count,
-        pending_referers_count=pending_referers_count
+        pending_referers_count=pending_referers_count,
+        chart_labels=chart_labels,
+        chart_data=chart_data
     )
 
 
@@ -910,7 +922,107 @@ def send_whatsapp_message(phone_number, message):
     except Exception as e:
         print("WhatsApp message failed:", e)
 
+from flask_login import login_required, current_user
 
+@bp.route('/admin/tasks', methods=['GET', 'POST'])
+@login_required
+def admin_tasks():
+    if current_user.username != 'admin':
+        flash("Access denied!", "danger")
+        return redirect(url_for('main.index'))
+
+    from app.models import Task, Staff
+
+    if request.method == 'POST':
+        title = request.form.get('title')
+        description = request.form.get('description')
+        staff_id = request.form.get('staff_id')
+
+        new_task = Task(title=title, description=description, staff_id=staff_id)
+        db.session.add(new_task)
+        db.session.commit()
+
+        flash('Task assigned successfully!', 'success')
+        return redirect(url_for('main.admin_tasks'))
+
+    staff_members = Staff.query.filter_by(verification_status='approved').all()
+    tasks = Task.query.order_by(Task.created_at.desc()).all()
+
+    return render_template('admin/tasks.html', staff_members=staff_members, tasks=tasks)
+
+@bp.route('/admin/tasks/delete/<int:id>', methods=['POST'])
+@login_required
+def admin_delete_task(id):
+    if current_user.username != 'admin':
+        flash("Access denied!", "danger")
+        return redirect(url_for('main.index'))
+
+    from app.models import Task
+    task = Task.query.get_or_404(id)
+    db.session.delete(task)
+    db.session.commit()
+    
+    flash('Task deleted successfully.', 'success')
+    return redirect(url_for('main.admin_tasks'))
+@bp.route('/staff/tasks', methods=['GET'])
+def staff_tasks():
+    if 'staff_id' not in session:
+        flash("Your staff session expired. Please log in again.", "danger")
+        return redirect(url_for('main.staff_login'))
+
+    from app.models import Task, Staff
+    staff = Staff.query.get(session['staff_id'])
+    my_tasks = Task.query.filter_by(staff_id=staff.id).order_by(Task.created_at.desc()).all()
+
+    return render_template('staff/work.html', staff=staff, tasks=my_tasks)
+
+@bp.route('/staff/tasks/complete/<int:id>', methods=['POST'])
+def staff_complete_task(id):
+    if 'staff_id' not in session: 
+        return redirect(url_for('main.staff_login'))
+
+    from app.models import Task
+    task = Task.query.get_or_404(id)
+    if task.staff_id == session['staff_id']:
+        task.status = 'Completed' if task.status == 'Pending' else 'Pending'
+        db.session.commit()
+        flash('Task status updated!', 'success')
+
+    return redirect(url_for('main.staff_work'))
+
+@bp.route("/admin/profile")
+@login_required
+def admin_profile():
+    if current_user.username != 'admin':
+        flash("Access denied.", "danger")
+        return redirect(url_for('main.index'))
+        
+    return render_template("admin/admin_profile.html")
+
+
+@bp.route("/admin/change-password", methods=["POST"])
+@login_required
+def admin_change_password():
+    if current_user.username != 'admin':
+        return redirect(url_for('main.index'))
+
+    current_password = request.form.get("current_password")
+    new_password = request.form.get("new_password")
+    confirm_password = request.form.get("confirm_password")
+
+    if not check_password_hash(current_user.password_hash, current_password):
+        flash("Incorrect current password.", "danger")
+        return redirect(url_for('main.admin_profile'))
+
+    if new_password != confirm_password:
+        flash("New passwords do not match.", "danger")
+        return redirect(url_for('main.admin_profile'))
+
+    current_user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+
+    flash("Admin password updated successfully!", "success")
+    return redirect(url_for('main.admin_profile'))
 
 @bp.route("/admin/product/add", methods=["GET","POST"])
 @login_required
@@ -942,8 +1054,6 @@ def add_product():
         return redirect(url_for("main.admin_dashboard"))
     return render_template("admin/add_product.html", form=form)
 
-
-
 @bp.route("/admin/product/delete/<int:pid>", methods=["POST"])
 @login_required
 def admin_delete_product(pid):
@@ -955,8 +1065,11 @@ def admin_delete_product(pid):
 @bp.route("/admin/referer-requests")
 @login_required
 def referer_requests():
-    referer_requests = Referer.query.filter_by(status="pending").all()
-    return render_template("admin/referer_requests.html", referer_requests=referer_requests)
+    if current_user.username != 'admin':
+        flash("Access denied.", "danger")
+        return redirect(url_for('main.index'))
+    all_referrers = Referer.query.order_by(Referer.id.desc()).all()
+    return render_template("admin/referer_requests.html", all_referrers=all_referrers)
 
 
 def send_whatsapp_message(phone_number, message):
@@ -997,9 +1110,6 @@ def uploaded_file(filename):
         abort(404)
 
     return send_from_directory(upload_folder, filename)
-
-
-
 
 @bp.route("/about")
 def about():
@@ -1121,6 +1231,29 @@ def admin_toggle_delivered(order_id):
     return redirect(url_for("main.admin_orders"))
 
 
+@bp.route('/admin/toggle-hiring', methods=['POST'])
+@login_required
+def admin_toggle_hiring():
+    from app.models import SiteSettings
+    
+    settings = SiteSettings.query.first()
+    if not settings:
+        settings = SiteSettings(hiring_mode=False)
+        db.session.add(settings)
+    
+    settings.hiring_mode = not settings.hiring_mode
+    
+    try:
+        db.session.commit()
+        status = "OPEN" if settings.hiring_mode else "CLOSED"
+        flash(f"Hiring Mode is now {status}.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Database error while toggling: {str(e)}", "error")
+
+    return redirect(url_for('main.admin_dashboard'))
+
+
 @bp.route("/admin/order/<int:order_id>/delete", methods=["POST"])
 @login_required
 def admin_delete_order(order_id):
@@ -1187,6 +1320,11 @@ def retrieve_pickup():
 
 @bp.route('/staff/signup', methods=['GET','POST'])
 def staff_signup():
+    from app.models import SiteSettings, Staff
+    settings = SiteSettings.query.first()
+    if not settings or not settings.hiring_mode:
+        flash("We are not currently accepting staff applications.", "error")
+        return redirect(url_for('main.index'))
     if request.method == 'POST':
         data = request.form
         if Staff.query.filter_by(username=data['username']).first():
@@ -1258,10 +1396,6 @@ def staff_signup():
             return redirect(url_for('main.staff_signup'))
 
     return render_template('staff/signup.html')
-
-
-
-
 
 @bp.route('/staff/login', methods=['GET','POST'])
 def staff_login():
@@ -1439,6 +1573,78 @@ def staff_work():
     except:
         abort(404, description="Dashboard not available for your role yet.")
 
+@bp.route('/staff/profile')
+def staff_profile():
+
+    if 'staff_id' not in session:
+        flash("Please log in first.", "error")
+        return redirect(url_for('main.staff_login'))
+        
+    staff = Staff.query.get_or_404(session['staff_id'])
+    return render_template('staff/staff_profile.html', staff=staff)
+
+@bp.route('/staff/update-info', methods=['POST'])
+def staff_update_info():
+    if 'staff_id' not in session:
+        return redirect(url_for('main.staff_login'))
+        
+    staff = Staff.query.get(session['staff_id'])
+    if not staff:
+        return redirect(url_for('main.staff_login'))
+
+    new_name = request.form.get('name')
+    new_username = request.form.get('username')
+
+    if new_name:
+        staff.name = new_name
+
+    if new_username and new_username != staff.username:
+        if Staff.query.filter_by(username=new_username).first():
+            flash("That username is already taken.", "error")
+            return redirect(url_for('main.staff_profile'))
+        staff.username = new_username
+
+    if 'profile_image' in request.files:
+        file = request.files['profile_image']
+        if file and file.filename != '':
+            ext = secure_filename(file.filename).rsplit('.', 1)[-1].lower()
+            timestamp = int(time.time())
+            filename = f"staff_{staff.id}_{timestamp}.{ext}"
+            upload_path = os.path.join(current_app.static_folder, 'uploads')
+            os.makedirs(upload_path, exist_ok=True)
+            file.save(os.path.join(upload_path, filename))
+            staff.profile_image = f"uploads/{filename}"
+
+    try:
+        db.session.commit()
+        flash('Profile updated successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Database error: {str(e)}', 'error')
+
+    return redirect(url_for('main.staff_profile'))
+
+@bp.route('/staff/change-password', methods=['POST'])
+def staff_change_password():
+    if 'staff_id' not in session:
+        return redirect(url_for('main.staff_login'))
+        
+    staff = Staff.query.get(session['staff_id'])
+    
+    curr_pw = request.form.get("current_password")
+    new_pw = request.form.get("new_password")
+    conf_pw = request.form.get("confirm_password")
+
+    if not check_password_hash(staff.password, curr_pw):
+        flash("Current password incorrect.", "error")
+    elif new_pw != conf_pw:
+        flash("New passwords do not match.", "error")
+    else:
+        staff.password = generate_password_hash(new_pw)
+        db.session.commit()
+        flash("Password updated successfully!", "success")
+
+    return redirect(url_for('main.staff_profile'))
 
 
 @bp.route('/staff/logout', methods=['POST'])
@@ -1802,3 +2008,18 @@ def view_receipt(reference):
     order = Order.query.filter_by(reference=reference).first_or_404()
 
     return render_template("receipt.html", order=order)
+
+
+@bp.route('/emergency-reset/<secret_key>')
+def emergency_reset(secret_key):
+    real_master_key = os.environ.get("MASTER_RESET_KEY")
+    if not real_master_key or secret_key != real_master_key:
+        return "Access Denied.", 403
+    from app.models import User
+    from werkzeug.security import generate_password_hash
+    admin = User.query.filter_by(username='admin').first()
+    if admin:
+        admin.password_hash = generate_password_hash('RescueMe2026!')
+        db.session.commit()
+        return "Emergency reset successful! You can now log in with the password: RescueMe2026!"
+    return "Admin account not found.", 404

@@ -1,59 +1,110 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h2 style="text-align:center;">Become a Verified Referrer</h2>
+<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2 style="text-align:center; margin-bottom: 30px;">Become a Verified Referrer</h2>
 
-<form method="POST" action="{{ url_for('main.apply_referer') }}">
+    <form method="POST" action="{{ url_for('main.apply_referer') }}">
 
-    <label>Full Name: </label>
-    <input type="text" id="full-name" name="full_name" required><br><br>
+        <label style="font-weight: bold;">Full Name: </label>
+        <input type="text" id="full-name" name="full_name" style="width: 50%; padding: 10px; margin-top: 5px; margin-bottom: 15px;" required><br>
 
-    <label>WhatsApp Number: </label>
-    <input type="text" name="whatsapp_number" placeholder="2348123456789" required><br><br>
+        <label style="font-weight: bold;">WhatsApp Number: </label>
+        <input type="text" name="whatsapp_number" placeholder="2348123456789" style="width: 50%; padding: 10px; margin-top: 5px; margin-bottom: 15px;" required><br>
 
-    <label for="bank">Select Your Bank:</label>
-    <select name="bank" id="banks" required>
-        <option value="">--Choose Bank--</option>
-        <option value="Access Bank">Access Bank</option>
-        <option value="Citibank">Citibank</option>
-        <option value="Ecobank">Ecobank</option>
-        <option value="Fidelity Bank">Fidelity Bank</option>
-        <option value="First Bank of Nigeria">First Bank of Nigeria</option>
-        <option value="First City Monument Bank (FCMB)">First City Monument Bank (FCMB)</option>
-        <option value="Globus Bank">Globus Bank</option>
-        <option value="Guaranty Trust Bank (GTBank)">Guaranty Trust Bank (GTBank)</option>
-        <option value="Heritage Bank">Heritage Bank</option>
-        <option value="Keystone Bank">Keystone Bank</option>
-        <option value="Polaris Bank">Polaris Bank</option>
-        <option value="Providus Bank">Providus Bank</option>
-        <option value="Stanbic IBTC Bank">Stanbic IBTC Bank</option>
-        <option value="Standard Chartered Bank">Standard Chartered Bank</option>
-        <option value="Sterling Bank">Sterling Bank</option>
-        <option value="SunTrust Bank">SunTrust Bank</option>
-        <option value="Titan Trust Bank">Titan Trust Bank</option>
-        <option value="Union Bank">Union Bank</option>
-        <option value="United Bank for Africa (UBA)">United Bank for Africa (UBA)</option>
-        <option value="Unity Bank">Unity Bank</option>
-        <option value="Wema Bank">Wema Bank</option>
-        <option value="Zenith Bank">Zenith Bank</option>
-        <option value="Opay">Opay</option>
-        <option value="PalmPay">PalmPay</option>
-        <option value="Kuda Bank">Kuda Bank</option>
-        <option value="Moniepoint">Moniepoint</option>
-    </select><br><br>
+        <label for="banks" style="font-weight: bold;">Select Your Bank:</label>
+        <select name="bank" id="banks" style="width: 50%; padding: 10px; margin-top: 5px; margin-bottom: 15px;" required>
+            <option value="">--Choose Bank--</option>
+            <option value="Access Bank">Access Bank</option>
+            <option value="Citibank">Citibank</option>
+            <option value="Ecobank">Ecobank</option>
+            <option value="Fidelity Bank">Fidelity Bank</option>
+            <option value="First Bank of Nigeria">First Bank of Nigeria</option>
+            <option value="First City Monument Bank (FCMB)">First City Monument Bank (FCMB)</option>
+            <option value="Globus Bank">Globus Bank</option>
+            <option value="Guaranty Trust Bank (GTBank)">Guaranty Trust Bank (GTBank)</option>
+            <option value="Heritage Bank">Heritage Bank</option>
+            <option value="Keystone Bank">Keystone Bank</option>
+            <option value="Polaris Bank">Polaris Bank</option>
+            <option value="Providus Bank">Providus Bank</option>
+            <option value="Stanbic IBTC Bank">Stanbic IBTC Bank</option>
+            <option value="Standard Chartered Bank">Standard Chartered Bank</option>
+            <option value="Sterling Bank">Sterling Bank</option>
+            <option value="SunTrust Bank">SunTrust Bank</option>
+            <option value="Titan Trust Bank">Titan Trust Bank</option>
+            <option value="Union Bank">Union Bank</option>
+            <option value="United Bank for Africa (UBA)">United Bank for Africa (UBA)</option>
+            <option value="Unity Bank">Unity Bank</option>
+            <option value="Wema Bank">Wema Bank</option>
+            <option value="Zenith Bank">Zenith Bank</option>
+            <option value="Opay">Opay</option>
+            <option value="PalmPay">PalmPay</option>
+            <option value="Kuda Bank">Kuda Bank</option>
+            <option value="Moniepoint">Moniepoint</option>
+        </select><br>
+            
+        <label style="font-weight: bold;">Account Number: </label>
+        <input type="text" id="account-number" name="account_number" minlength="10" maxlength="10" style="width: 50%; padding: 10px; margin-top: 5px; margin-bottom: 15px;" required>
 
-    <label>Account Number: </label>
-    <input type="text" id="account-number" name="account_number" maxlength="10" required><br><br>
+       <div style="margin-bottom: 15px;">
+            <input type="checkbox" id="same-name" style="width: auto; height: auto; cursor: pointer; transform: scale(1.2); margin-right: 5px;" />
+            <label for="same-name" style="cursor: pointer;">Account name same as my full name?</label>
+        </div>
 
-    <input type="checkbox" id="same-name" />
-    <label for="same-name">Account name same as my full name? </label><br><br>
+        <label style="font-weight: bold;">Account Name: </label>
+        <input type="text" id="account-name" name="account_name" style="width: 50%; padding: 10px; margin-top: 5px; margin-bottom: 25px;" required>
 
-    <label>Account Name: </label>
-    <input type="text" id="account-name" name="account_name" required><br><br>
+        <hr style="margin-bottom: 20px; border-top: 1px solid #ccc;">
+        
+        <label style="font-weight: bold; font-size: 1.1em; color: #333;">Terms of Service</label>
+        <div style="height: 200px; overflow-y: auto; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; margin-top: 10px; margin-bottom: 15px; font-size: 0.9em; color: #495057; line-height: 1.5;">
+            
+            <h4 style="margin-top: 0;">1. Program Overview</h4>
+            <p>The Heavenly Paint Referrer Program allows approved individuals to earn commissions by promoting Heavenly Paint products using a unique referral tracking link. Commissions are earned only on successful, completed, and fully paid orders.</p>
 
-    <button type="submit" class="btn">Complete Registration</button>
+            <h4>2. Enrollment and Account Security</h4>
+            <ul style="padding-left: 20px;">
+                <li><strong>Approval:</strong> Submitting an application does not guarantee acceptance. Heavenly Paint Limited reserves the right to approve or reject any application at its sole discretion.</li>
+                <li><strong>Accuracy:</strong> You must provide accurate information, including your legal name, active WhatsApp number, and correct Nigerian bank account details.</li>
+            </ul>
 
-</form>
+            <h4>3. Earning Commissions</h4>
+            <ul style="padding-left: 20px;">
+                <li><strong>Valid Sales:</strong> A commission is generated only when a customer clicks your link and completes a fully paid purchase.</li>
+                <li><strong>Cancellations & Refunds:</strong> Cancelled or refunded orders will result in voided commissions.</li>
+                <li><strong>Self-Referrals:</strong> You may not use your own link to purchase paint for yourself.</li>
+            </ul>
+
+            <h4>4. Withdrawals and Payments</h4>
+            <p>You may request a payout through your Dashboard. Payments are processed to the bank details provided. Heavenly Paint Limited is not responsible for delayed payouts due to incorrect banking information.</p>
+
+            <h4>5. Prohibited Conduct</h4>
+            <p>The following activities are strictly prohibited and will result in immediate account termination:</p>
+            <ul style="padding-left: 20px;">
+                <li><strong>Spamming:</strong> Sending unsolicited messages containing your link.</li>
+                <li><strong>Misrepresentation:</strong> Claiming to be an employee or official representative of the company.</li>
+                <li><strong>Deceptive Marketing:</strong> Making false claims about our prices or creating fake discounts.</li>
+            </ul>
+
+            <h4>6. Account Termination and Forfeiture of Earnings</h4>
+            <p>Heavenly Paint Limited reserves the right to suspend or permanently delete any Referrer account at any time for violating these rules.</p>
+            
+            <div style="background-color: #f8d7da; color: #721c24; padding: 10px; border-left: 4px solid #dc3545; margin-top: 10px;">
+                <strong>CRITICAL WARNING:</strong> If your account is permanently deleted due to fraudulent activity or prohibited conduct, <strong>you will immediately and permanently forfeit any and all pending, unpaid, or future commissions in your account.</strong>
+            </div>
+        </div>
+
+        <div style="background-color: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 5px; margin-bottom: 25px; display: flex; align-items: flex-start; gap: 10px;">
+            <input type="checkbox" id="tos-agree" name="tos_agreed" required style="margin-top: 4px; width: auto; height: auto;  cursor: pointer; transform: scale(1.3);">
+            <label for="tos-agree" style="cursor: pointer; font-weight: bold; color: #856404; margin: 0; line-height: 1.4;">
+                I have read and agree to the Terms of Service, and understand that violating program rules will result in account deletion and forfeiture of unpaid earnings.
+            </label>
+        </div>
+
+        <button type="submit" class="btn">Complete Registration</button>
+
+    </form>
+</div>
 
 <script>
 document.getElementById('same-name').addEventListener('change', function () {
@@ -63,9 +114,11 @@ document.getElementById('same-name').addEventListener('change', function () {
     if (this.checked) {
         accountNameField.value = fullName;
         accountNameField.readOnly = true;
+        accountNameField.style.backgroundColor = "#e9ecef";
     } else {
         accountNameField.value = '';
         accountNameField.readOnly = false;
+        accountNameField.style.backgroundColor = "white";
     }
 });
 

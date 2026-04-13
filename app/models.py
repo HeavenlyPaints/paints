@@ -157,7 +157,8 @@ class Staff(db.Model, UserMixin):
     verified = db.Column(db.Boolean, default=False)
     verification_status = db.Column(db.String(50), default="pending")
     rejection_reason = db.Column(db.String(200), nullable=True)
-
+    password_hash = db.Column(db.String(255), nullable=True)
+    profile_image = db.Column(db.String(100), default='default_avatar.png')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
@@ -186,3 +187,18 @@ class Coupon(db.Model):
     discount_pct = db.Column(db.Float, nullable=False) 
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class SiteSettings(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    hiring_mode = db.Column(db.Boolean, default=False)
+
+class Task(db.Model):
+    __tablename__ = 'tasks'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(150), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='Pending')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    staff_id = db.Column(db.Integer, db.ForeignKey('staffs.id'), nullable=False)
+    staff = db.relationship('Staff', backref=db.backref('tasks', lazy=True))

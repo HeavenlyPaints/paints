@@ -1,13 +1,12 @@
-{% extends "base.html" %}
+{% extends "admin_base.html" %}
 {% block content %}
 
 <style>
-/* CSS for the floating red notification bubbles */
 .notify-badge {
     position: absolute;
     top: -8px;
     right: -8px;
-    background-color: #dc3545; /* Bootstrap Red */
+    background-color: #dc3545;
     color: white;
     border-radius: 50%;
     padding: 3px 7px;
@@ -16,215 +15,276 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     z-index: 10;
 }
-/* Ensure buttons act as an anchor for the absolute badge */
 .btn-relative {
     position: relative;
     display: inline-block;
     text-decoration: none;
+    margin-bottom: 10px;
+}
+.stat-card {
+    flex: 1;
+    min-width: 200px;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    border-top: 4px solid #007bff;
+}
+.dashboard-section {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    margin-bottom: 30px;
 }
 </style>
 
-<h2>Admin Dashboard</h2>
-
-<form action="{{ url_for('main.admin_logout') }}" method="GET">
-    <button type="submit" class="btn">Logout</button>
-</form>
-
-<div class="admin-stats" style="margin-top: 20px;">
-    <div><strong>Monthly Earnings:</strong> ₦{{ "{:,.2f}".format(monthly_earnings) }}</div><br>
-    <div><strong>Total Orders:</strong> {{ orders_count }}</div><br>
-    <div><strong>Total Referrers:</strong> {{ referrers_count }}</div><br>
-</div>
-
-<div class="admin-actions" style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 20px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+    <h2>Admin Dashboard</h2>
     
-    <a class="btn btn-primary btn-relative" href="{{ url_for('main.add_product') }}">Add Product</a>
-    
-    <a class="btn btn-info btn-relative" href="{{ url_for('main.referer_requests') }}">
-        Pending Referrer Requests
-        {% if pending_referers_count > 0 %}
-            <span class="notify-badge">{{ pending_referers_count }}</span>
-        {% endif %}
-    </a>
-    
-    <a class="btn btn-warning btn-relative" href="{{ url_for('main.admin_withdrawals_view') }}">
-        Withdrawals
-        {% if pending_withdrawals_count > 0 %}
-            <span class="notify-badge">{{ pending_withdrawals_count }}</span>
-        {% endif %}
-    </a>
-    
-    <a class="btn btn-primary btn-relative" href="{{ url_for('main.staff_verification') }}">
-        Verify Staffs
-        {% if pending_staff_count > 0 %}
-            <span class="notify-badge">{{ pending_staff_count }}</span>
-        {% endif %}
-    </a>
-    
-    <a class="btn btn-primary btn-relative" href="{{ url_for('main.admin_manual_order') }}">Manual Sales</a>
-    
-    <a class="btn btn-success btn-relative" href="{{ url_for('main.admin_orders') }}">
-        Manage Orders
-        {% if pending_orders_count > 0 %}
-            <span class="notify-badge">{{ pending_orders_count }}</span>
-        {% endif %}
-    </a>
-    
-    <a class="btn btn-success btn-relative" href="{{ url_for('main.admin_coupons') }}">Manage Coupons</a>
-    
-    <a class="btn btn-primary btn-relative" href="{{ url_for('main.verify_pickup_page') }}">Verify Pickup Code</a>
-
-    <a class="btn btn-secondary btn-relative" style="background-color: #6c757d; color: white;" href="{{ url_for('main.export_staffs') }}">
-        📥 Backup Staff Data
-    </a>
-    
-    <a class="btn btn-secondary btn-relative" style="background-color: #6c757d; color: white;" href="{{ url_for('main.export_referrers') }}">
-        📥 Backup Referrer Data
-    </a>
-</div>
-
-<div id="pickupModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index: 9999;">
-    <div style="background:white; padding:20px; border-radius:10px; text-align:center; width:300px;">
-        <h3>Your Pickup Code</h3>
-        <p id="pickupCodeText" style="font-weight:bold; font-size:20px;"></p>
-        <button id="copyPickupCode" class="btn btn-primary">Copy Code</button>
-        <button onclick="document.getElementById('pickupModal').style.display='none'" class="btn btn-secondary">Close</button>
+    <div style="display: flex; gap: 10px;">
+        <a class="btn" href="{{ url_for('main.admin_tasks') }}" style="background-color: #17a2b8; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; display: inline-block; margin: 5px;">
+    <i class="fa-solid fa-clipboard-list"></i> Manage Tasks
+</a>
+        <a href="{{ url_for('main.admin_profile') }}" class="btn" style="background-color: #343a40; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; font-weight: bold;">
+            <i class="fa-solid fa-gear"></i> Profile Settings
+        </a>
+        <form action="{{ url_for('main.admin_logout') }}" method="GET" style="margin: 0;">
+            <button type="submit" class="btn danger">Logout</button>
+        </form>
     </div>
 </div>
 
-<hr>
+<div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px;">
+    <div class="stat-card" style="border-top-color: #28a745;">
+        <h4 style="margin-top: 0; color: #6c757d;">Monthly Earnings</h4>
+        <h2 style="margin: 0;">₦{{ "{:,.2f}".format(monthly_earnings) }}</h2>
+    </div>
+    <div class="stat-card" style="border-top-color: #17a2b8;">
+        <h4 style="margin-top: 0; color: #6c757d;">Total Orders</h4>
+        <h2 style="margin: 0;">{{ orders_count }}</h2>
+    </div>
+    <div class="stat-card" style="border-top-color: #ffc107;">
+        <h4 style="margin-top: 0; color: #6c757d;">Total Referrers</h4>
+        <h2 style="margin: 0;">{{ referrers_count }}</h2>
+    </div>
+</div>
 
-<h3>All Products</h3>
-{% if products %}
-<table class="table table-bordered table-striped">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Description</th>
-            <th>Price (₦)</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for product in products %}
-        <tr>
-            <td>{{ product.name }}</td>
-            <td>{{ product.description }}</td>
-            <td>₦{{ "{:,.2f}".format(product.price) }}</td>
-            <td>
-                <a class="btn btn-warning btn-sm" style="text-decoration:none" href="{{ url_for('main.edit_product', id=product.id) }}">Edit</a>
-                <form action="{{ url_for('main.delete_product', id=product.id) }}" method="POST" style="display:inline;">
-                    <button type="submit" style="text-decoration:none" class="btn btn-danger btn-sm" onclick="return confirm('Delete this product?');">Delete</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No products available.</p>
-{% endif %}
+<div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px;">
+    
+    <div class="dashboard-section" style="flex: 1; min-width: 300px; margin-bottom: 0;">
+        <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Hiring Control</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+            <p style="margin: 0;">Status: 
+                {% set settings = SiteSettings.query.first() %}
+                {% if settings and settings.hiring_mode %}
+                    <span style="color: #28a745; font-weight: bold;">🟢 ACCEPTING</span>
+                {% else %}
+                    <span style="color: #dc3545; font-weight: bold;">🔴 CLOSED</span>
+                {% endif %}
+            </p>
+            <form method="POST" action="{{ url_for('main.admin_toggle_hiring') }}" style="margin: 0;">
+                <button type="submit" class="btn" style="background-color: #343a40; color: white;">Toggle Mode</button>
+            </form>
+        </div>
+    </div>
 
-<hr>
+<div class="dashboard-section">
+    <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+        <i class="fa-solid fa-chart-area" style="color: #007bff;"></i> 7-Day Revenue Trend
+    </h3>
+    <div style="position: relative; height: 300px; width: 100%;">
+        <canvas id="salesChart"></canvas>
+    </div>
+</div>
 
-<h3>Pending Referrers</h3>
-{% if pending_referers %}
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>WhatsApp</th>
-            <th>Bank</th>
-            <th>Account No.</th>
-            <th>Account Name</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for r in pending_referers %}
-        <tr>
-            <td>{{ r.full_name }}</td>
-            <td>{{ r.whatsapp_number }}</td>
-            <td>{{ r.bank_name }}</td>
-            <td>{{ r.account_number }}</td>
-            <td>{{ r.account_name }}</td>
-            <td>
-                <form action="{{ url_for('main.admin_approve_referer', id=r.id) }}" method="POST" style="display:inline;">
-                    <button type="submit" style="text-decoration:none" class="btn btn-success btn-sm">Approve</button>
-                </form>
-                <form action="{{ url_for('main.admin_reject_referer', id=r.id) }}" method="POST" style="display:inline;">
-                    <button type="submit" style="text-decoration:none" class="btn btn-danger btn-sm">Reject</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No pending referrer applications.</p>
-{% endif %}
+    <div class="dashboard-section" style="flex: 2; min-width: 350px; margin-bottom: 0;">
+        <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Quick Actions</h3>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px;">
+            <a class="btn btn-primary btn-relative" href="{{ url_for('main.add_product') }}">Add Product</a>
+            
+            <a class="btn btn-info btn-relative" href="{{ url_for('main.referer_requests') }}">
+                Manage Referrers
+                {% if pending_referers_count > 0 %}<span class="notify-badge">{{ pending_referers_count }}</span>{% endif %}
+            </a>
+            
+            <a class="btn btn-warning btn-relative" href="{{ url_for('main.admin_withdrawals_view') }}">
+                Withdrawals
+                {% if pending_withdrawals_count > 0 %}<span class="notify-badge">{{ pending_withdrawals_count }}</span>{% endif %}
+            </a>
+            
+            <a class="btn btn-primary btn-relative" href="{{ url_for('main.staff_verification') }}">
+                Manage Staffs
+                {% if pending_staff_count > 0 %}<span class="notify-badge">{{ pending_staff_count }}</span>{% endif %}
+            </a>
+            
+            <a class="btn btn-success btn-relative" href="{{ url_for('main.admin_orders') }}">
+                Manage Orders
+                {% if pending_orders_count > 0 %}<span class="notify-badge">{{ pending_orders_count }}</span>{% endif %}
+            </a>
 
-<hr>
+            <a class="btn btn-primary btn-relative" href="{{ url_for('main.admin_manual_order') }}">Manual Sales</a>
+            <a class="btn btn-success btn-relative" href="{{ url_for('main.admin_coupons') }}">Manage Coupons</a>
+            <a class="btn btn-primary btn-relative" href="{{ url_for('main.verify_pickup_page') }}">Verify Pickup Code</a>
+            
+            <a class="btn btn-secondary btn-relative" style="background-color: #6c757d; color: white;" href="{{ url_for('main.export_staffs') }}">📥 Backup Staff</a>
+            <a class="btn btn-secondary btn-relative" style="background-color: #6c757d; color: white;" href="{{ url_for('main.export_referrers') }}">📥 Backup Referrers</a>
+        </div>
+    </div>
+</div>
 
-<h3>Approved Referrers</h3>
-{% if approved_referers %}
-<table class="table table-bordered table-success">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>WhatsApp</th>
-            <th>Badge</th>
-            <th>Referrals</th>
-            <th>Earnings (₦)</th>
-            <th>Dashboard</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for r in approved_referers %}
-        <tr>
-            <td>{{ r.full_name }}</td>
-            <td>{{ r.whatsapp_number }}</td>
-            <td>{{ r.badge }}</td>
-            <td>{{ r.referrals_count }}</td>
-            <td>₦{{ "{:,.2f}".format(r.earnings) }}</td>
-            <td>
-                <a href="{{ url_for('main.referer_dashboard', token=r.token) }}" target="_blank">Open Dashboard</a>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No approved referrers.</p>
-{% endif %}
+<div class="dashboard-section">
+    <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">All Products</h3>
+    {% if products %}
+    <div style="overflow-x: auto;">
+        <table class="table table-bordered table-striped" style="width: 100%; min-width: 600px;">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Price (₦)</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.description }}</td>
+                    <td>₦{{ "{:,.2f}".format(product.price) }}</td>
+                    <td>
+                        <a class="btn btn-warning btn-sm" style="text-decoration:none" href="{{ url_for('main.edit_product', id=product.id) }}">Edit</a>
+                        <form action="{{ url_for('main.delete_product', id=product.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" style="text-decoration:none" class="btn btn-danger btn-sm" onclick="return confirm('Delete this product?');">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No products available.</p>
+    {% endif %}
+</div>
 
-<hr>
+<div class="dashboard-section">
+    <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Pending Referrers</h3>
+    {% if pending_referers %}
+    <div style="overflow-x: auto;">
+        <table class="table table-striped" style="width: 100%; min-width: 600px;">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>WhatsApp</th>
+                    <th>Bank</th>
+                    <th>Account No.</th>
+                    <th>Account Name</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in pending_referers %}
+                <tr>
+                    <td>{{ r.full_name }}</td>
+                    <td>{{ r.whatsapp_number }}</td>
+                    <td>{{ r.bank_name }}</td>
+                    <td>{{ r.account_number }}</td>
+                    <td>{{ r.account_name }}</td>
+                    <td>
+                        <form action="{{ url_for('main.admin_approve_referer', id=r.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" style="text-decoration:none" class="btn btn-success btn-sm">Approve</button>
+                        </form>
+                        <form action="{{ url_for('main.admin_reject_referer', id=r.id) }}" method="POST" style="display:inline;">
+                            <button type="submit" style="text-decoration:none" class="btn btn-danger btn-sm">Reject</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No pending referrer applications.</p>
+    {% endif %}
+</div>
 
-<h3>Recent Orders</h3>
-{% if orders %}
-<table class="table table-bordered table-striped">
-    <thead>
-        <tr>
-            <th>Reference</th>
-            <th>Amount (₦)</th>
-            <th>Paid</th>
-            <th>Delivered</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for o in orders %}
-        <tr>
-            <td>{{ o.reference }}</td>
-            <td>₦{{ "{:,.2f}".format(o.amount) }}</td>
-            <td>{{ 'Yes' if o.paid else 'No' }}</td>
-            <td>{{ 'Yes' if o.delivered else 'No' }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No recent orders.</p>
-{% endif %}
+<div class="dashboard-section">
+    <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Approved Referrers</h3>
+    {% if approved_referers %}
+    <div style="overflow-x: auto;">
+        <table class="table table-bordered table-success" style="width: 100%; min-width: 600px;">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>WhatsApp</th>
+                    <th>Badge</th>
+                    <th>Referrals</th>
+                    <th>Earnings (₦)</th>
+                    <th>Dashboard</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in approved_referers %}
+                <tr>
+                    <td>{{ r.full_name }}</td>
+                    <td>{{ r.whatsapp_number }}</td>
+                    <td>{{ r.badge }}</td>
+                    <td>{{ r.referrals_count }}</td>
+                    <td>₦{{ "{:,.2f}".format(r.earnings) }}</td>
+                    <td>
+                        <a href="{{ url_for('main.referer_dashboard', token=r.token) }}" target="_blank">Open Dashboard</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No approved referrers.</p>
+    {% endif %}
+</div>
+
+<div class="dashboard-section">
+    <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Recent Orders</h3>
+    {% if orders %}
+    <div style="overflow-x: auto;">
+        <table class="table table-bordered table-striped" style="width: 100%; min-width: 600px;">
+            <thead>
+                <tr>
+                    <th>Reference</th>
+                    <th>Amount (₦)</th>
+                    <th>Paid</th>
+                    <th>Delivered</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr>
+                    <td>{{ o.reference }}</td>
+                    <td>₦{{ "{:,.2f}".format(o.amount) }}</td>
+                    <td>{{ 'Yes' if o.paid else 'No' }}</td>
+                    <td>{{ 'Yes' if o.delivered else 'No' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No recent orders.</p>
+    {% endif %}
+</div>
+
+<div id="pickupModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); justify-content:center; align-items:center; z-index: 9999;">
+    <div style="background:white; padding:30px; border-radius:10px; text-align:center; width:300px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+        <h3 style="margin-top: 0;">Your Pickup Code</h3>
+        <p id="pickupCodeText" style="font-weight:bold; font-size:24px; letter-spacing: 2px; margin: 20px 0;"></p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button id="copyPickupCode" class="btn btn-primary">Copy Code</button>
+            <button onclick="document.getElementById('pickupModal').style.display='none'" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+</div>
 
 <script>
 function showPickupCode(code) {
@@ -236,5 +296,57 @@ function showPickupCode(code) {
             .then(() => alert("Pickup code copied!"));
     };
 }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const ctx = document.getElementById('salesChart').getContext('2d');
+        
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                // Flask injects the lists directly into JavaScript
+                labels: {{ chart_labels | safe }},
+                datasets: [{
+                    label: 'Revenue (₦)',
+                    data: {{ chart_data | safe }},
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#007bff',
+                    pointRadius: 4,
+                    fill: true,
+                    tension: 0.4 // This gives the line a smooth, elegant curve
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let value = context.parsed.y;
+                                return '₦' + value.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '₦' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
 </script>
 {% endblock %}

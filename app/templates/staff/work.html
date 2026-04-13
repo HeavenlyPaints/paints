@@ -1,0 +1,48 @@
+{% extends "staff_base.html" %}
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2 style="margin: 0; color: #333;"><i class="fa-solid fa-briefcase"></i> My Work Area</h2>
+    <a href="{{ url_for('main.staff_dashboard') }}" class="btn" style="background-color: #6c757d; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px;">&larr; Back to Dashboard</a>
+</div>
+
+<div style="background: white; padding: 30px; border-radius: 8px; border-top: 4px solid #007bff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+    <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">My Assigned Duties</h3>
+    
+    <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+        {% for task in tasks %}
+        <div style="border: 1px solid #e0e0e0; border-left: 5px solid {{ '#28a745' if task.status == 'Completed' else '#ffc107' }}; border-radius: 6px; padding: 20px; background-color: {{ '#f8fff9' if task.status == 'Completed' else '#fffdf7' }}; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; transition: transform 0.2s;">
+            
+            <div style="flex: 1; min-width: 250px;">
+                <h4 style="margin: 0 0 8px 0; color: #333; font-size: 1.2em; {{ 'text-decoration: line-through; color: #888;' if task.status == 'Completed' else '' }}">{{ task.title }}</h4>
+                
+                {% if task.description %}
+                    <p style="margin: 0 0 12px 0; color: #555; font-size: 1em; line-height: 1.4;">{{ task.description }}</p>
+                {% endif %}
+                
+                <small style="color: #999; font-weight: bold;"><i class="fa-regular fa-clock"></i> Assigned: {{ task.created_at.strftime('%b %d, %I:%M %p') }}</small>
+            </div>
+
+            <div>
+                <form action="{{ url_for('main.staff_complete_task', id=task.id) }}" method="POST" style="margin: 0;">
+                    {% if task.status == 'Completed' %}
+                        <button type="submit" style="background-color: #6c757d; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; min-width: 160px;">
+                            <i class="fa-solid fa-rotate-left"></i> Mark Pending
+                        </button>
+                    {% else %}
+                        <button type="submit" style="background-color: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; min-width: 160px; box-shadow: 0 2px 4px rgba(40,167,69,0.3);">
+                            <i class="fa-solid fa-check"></i> Complete Task
+                        </button>
+                    {% endif %}
+                </form>
+            </div>
+            
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 50px 20px; color: #6c757d;">
+            <i class="fa-solid fa-mug-hot" style="font-size: 3.5em; color: #dee2e6; margin-bottom: 20px; display: block;"></i>
+            <p style="font-size: 1.2em; margin: 0;">No tasks assigned right now. You're all caught up!</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

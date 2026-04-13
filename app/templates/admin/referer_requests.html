@@ -1,41 +1,80 @@
-{% extends "base.html" %}
+{% extends "admin_base.html" %}
 {% block content %}
 
-<h2>Referer Requests</h2>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2>Referrer Management</h2>
+</div>
 
 <div class="responsive-table">
-  <table>
+  <table border="1" cellpadding="10" cellspacing="0" width="100%">
     <thead>
-      <tr>
+      <tr style="background-color: #f8f9fa;">
         <th>Name</th>
-        <th>Email</th>
-        <th>Phone</th>
         <th>WhatsApp</th>
+        <th>Bank Details</th>
+        <th>Earnings</th>
+        <th>Status</th>
         <th>Actions</th>
       </tr>
     </thead>
 
     <tbody>
-      {% for r in referer_requests %}
+      {% for r in all_referrers %}
       <tr>
-        <td>{{ r.name }}</td>
-        <td>{{ r.email }}</td>
-        <td>{{ r.phone }}</td>
+        <td><strong>{{ r.name }}</strong></td>
         <td>{{ r.whatsapp }}</td>
         <td>
-          <form method="POST" action="{{ url_for('main.admin_approve_referer', id=r.id) }}" style="display:inline">
-            <button class="btn" type="submit">Approve</button>
+            <small>
+                {{ r.bank_name }}<br>
+                {{ r.account_number }}<br>
+                {{ r.account_name }}
+            </small>
+        </td>
+        <td style="font-weight: bold; color: #28a745;">₦{{ "{:,.2f}".format(r.earnings) }}</td>
+        
+        <td>
+            {% if r.status == 'approved' %}
+                <span style="color: white; background: #28a745; padding: 3px 8px; border-radius: 12px; font-size: 0.85em; font-weight: bold;">Approved</span>
+            {% elif r.status == 'rejected' %}
+                <span style="color: white; background: #dc3545; padding: 3px 8px; border-radius: 12px; font-size: 0.85em; font-weight: bold;">Rejected</span>
+            {% else %}
+                <span style="color: #856404; background: #fff3cd; padding: 3px 8px; border-radius: 12px; font-size: 0.85em; font-weight: bold;">Pending</span>
+            {% endif %}
+        </td>
+
+        <td style="white-space: nowrap;">
+          
+          {% if r.status == 'pending' %}
+              <form method="POST" action="{{ url_for('main.admin_approve_referer', id=r.id) }}" style="display:inline">
+                <button type="submit" class="btn" style="background-color: #28a745; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">Approve</button>
+              </form>
+              
+              <form method="POST" action="{{ url_for('main.admin_reject_referer', id=r.id) }}" style="display:inline; margin-left: 5px;">
+                <button type="submit" class="btn" style="background-color: #ffc107; color: black; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">Reject</button>
+              </form>
+          {% endif %}
+
+          <form method="POST" 
+                action="{{ url_for('main.admin_delete_referer', id=r.id) }}" 
+                style="display:inline; margin-left: 5px;" 
+                onsubmit="return confirm('🚨 WARNING: Are you sure you want to permanently delete {{ r.name }}? This will erase their account and any pending withdrawals. This cannot be undone.');">
+            
+            <button type="submit" class="btn" style="background-color: #dc3545; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
+                Delete
+            </button>
           </form>
 
-          <form method="POST" action="{{ url_for('main.admin_reject_referer', id=r.id) }}" style="display:inline">
-            <button class="btn" type="submit">Reject</button>
-          </form>
         </td>
       </tr>
       {% endfor %}
+      
+      {% if not all_referrers %}
+      <tr>
+          <td colspan="6" style="text-align: center; padding: 20px; color: #6c757d;">No referrers found in the database.</td>
+      </tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
 
 {% endblock %}
-

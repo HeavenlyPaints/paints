@@ -1,0 +1,44 @@
+{% extends "admin_base.html" %}
+{% block content %}
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2>Admin Profile & Settings</h2>
+    <a href="{{ url_for('main.admin_dashboard') }}" class="btn" style="background-color: #6c757d; color: white; text-decoration: none; padding: 8px 15px; border-radius: 5px;">&larr; Back to Dashboard</a>
+</div>
+
+<div style="display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; align-items: flex-start;">
+    
+    <div class="dashboard-card" style="flex: 1; min-width: 300px; max-width: 400px; border-top: 4px  solid #007bff; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        <h3 style="margin-top: 0; color:coral"><i class="fa-solid fa-user-shield" style= color:teal;></i> Account Details</h3>
+        <hr style="border-top: 1px solid #eee; margin-bottom: 15px;">
+        
+        <p style= color:magenta;><strong style= color:green>Role:</strong> Master Administrator</p>
+        <p style= color:magenta;><strong style= color:green>Username:</strong> <span style="background: #e9ecef; padding: 3px 8px; border-radius: 4px; font-family: monospace;">{{ current_user.username }}</span></p>
+        
+        <div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border-left: 3px solid #6c757d; font-size: 0.85em; color:red;">
+            <strong style= color:green>Security Note:</strong> The master admin username is permanently locked to "admin" to ensure core system routing and security protocols cannot be accidentally broken.
+        </div>
+    </div>
+
+    <div class="dashboard-card" style="flex: 1; min-width: 300px; max-width: 500px; border-top: 4px solid #343a40; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        <h3 style="margin-top: 0; margin-bottom: 20px; color:coral;"><i class="fa-solid fa-lock" style= "color:teal;"></i> Update Password</h3>
+        
+        <form method="POST" action="{{ url_for('main.admin_change_password') }}">
+            <label style="font-weight: bold; font-size: 0.9em; color:red;">Current Password:</label>
+            <input type="password" name="current_password" required style="width: 50%; padding: 10px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"><br>
+
+            <label style="font-weight: bold; font-size: 0.9em; color:green;">New Password:</label>
+            <input type="password" name="new_password" minlength="6" required style="width: 50%; padding: 10px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"><br>
+
+            <label style="font-weight: bold; font-size: 0.9em; color:green;">Confirm New Password:</label>
+            <input type="password" name="confirm_password" minlength="6" required style="width: 50%; padding: 10px; margin-top: 5px; margin-bottom: 25px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"><br>
+
+            <button type="submit" class="btn" style="background-color: #343a40; color: white; border: none;">
+                Update Secure Password
+            </button>
+        </form>
+    </div>
+
+</div>
+
+{% endblock %}
