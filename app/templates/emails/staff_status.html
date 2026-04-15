@@ -1,0 +1,17 @@
+<div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
+    <h2 style="color: {{ 'green' if status == 'approved' else 'red' }};">
+        Account {{ status | title }}
+    </h2>
+    <p>Hello {{ name }},</p>
+    
+    {% if status == 'approved' %}
+    <p>Great news! Your application to <strong>Heavenly Paint Limited</strong> has been approved. You can now log in to your dashboard to view your assigned tasks.</p>
+    <a href="https://heavenlypaints.onrender.com/staff/login" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Login to Dashboard</a>
+    {% else %}
+    <p>Thank you for your interest in Heavenly Paint Limited. Unfortunately, your application has been declined at this time.</p>
+    <p><strong>Reason:</strong> {{ reason }}</p>
+    <p>If you have questions, please contact management.</p>
+    {% endif %}
+    
+    <p style="margin-top: 20px; font-size: 12px; color: #777;">Color your world with Shree.</p>
+</div>

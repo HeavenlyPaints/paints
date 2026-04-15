@@ -7,7 +7,6 @@ from flask_mailman import Mail
 from dotenv import load_dotenv
 from config import Config
 
-
 load_dotenv()
 
 db = SQLAlchemy()
@@ -18,6 +17,12 @@ mail = Mail()
 def create_app():
     app = Flask(__name__, static_folder="static", template_folder="templates")
     app.config.from_object(Config)
+    app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+    app.config['MAIL_PORT'] = 587
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+    app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_USERNAME')
 
     db.init_app(app)
     migrate.init_app(app, db)

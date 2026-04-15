@@ -11,6 +11,8 @@ from flask_login import logout_user, login_required
 from sqlalchemy.exc import IntegrityError
 from flask import send_file, abort, current_app
 import io
+from twilio.rest import Client
+from threading import Thread
 import os
 from PIL import Image
 from .models import OrderItem
@@ -60,6 +62,135 @@ def load_user(user_id):
 def inject_site_settings():
     from app.models import SiteSettings
     return dict(SiteSettings=SiteSettings)
+
+from threading import Thread
+from flask_mailman import EmailMessage
+
+def send_async_email(app, msg):
+    with app.app_context():
+        msg.send()
+
+from flask import render_template
+
+def send_welcome_email(user_email, user_name, user_role):
+
+    html_content = render_template('emails/welcome_staff.html',
+                                   name=user_name,
+                                   role=user_role)
+    subject = "Application Received - Heavenly Paint Limited"
+    msg = EmailMessage(
+        subject,
+        html_content,
+        to=[user_email]
+    )
+    msg.content_subtype = "html"
+    Thread(target=send_async_email, args=(current_app._get_current_object(), msg)).start()
+def send_status_email(user_email, user_name, status, reason=None):
+    html_content = render_template('emails/staff_status.html',
+                                   name=user_name,
+                                   status=status,
+                                   reason=reason)
+    subject = f"Heavenly Paint Limited - Account {status.title()}"
+    msg = EmailMessage(subject, html_content, to=[user_email])
+    msg.content_subtype = "html"
+    Thread(target=send_async_email, args=(current_app._get_current_object(), msg)).start()
+def send_task_email(user_email, user_name, task_title, task_desc, task_link):
+    html_content = render_template('emails/new_task.html',
+                                   name=user_name,
+                                   task_title=task_title,
+                                   task_desc=task_desc,
+                                   task_link=task_link)
+    subject = f"New Task Assigned: {task_title}"
+    msg = EmailMessage(subject, html_content, to=[user_email])
+    msg.content_subtype = "html"
+    Thread(target=send_async_email, args=(current_app._get_current_object(), msg)).start()
+
+
+def send_async_twilio(client, from_number, to_number, body):
+    try:
+        client.messages.create(
+            from_=f"whatsapp:{from_number}",
+            body=body,
+            to=f"whatsapp:{to_number}"
+        )
+    except Exception as e:
+        print(f"Twilio WhatsApp Error: {e}")
+
+def send_async_twilio(client, from_number, to_number, body):
+    try:
+        client.messages.create(
+            from_=f"whatsapp:{from_number}",
+            body=body,
+            to=f"whatsapp:{to_number}"
+        )
+    except Exception as e:
+        print(f"Twilio WhatsApp Error: {e}")
+
+def send_whatsapp_welcome(phone_number, name):
+    account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
+    auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
+    from_number = os.environ.get('TWILIO_WHATSAPP_NUMBER')
+    
+    if not all([account_sid, auth_token, from_number]):
+        print("Credentials retrieval error!")
+        return
+
+    client = Client(account_sid, auth_token)
+
+    clean_phone = phone_number.replace(" ", "")
+    if clean_phone.startswith("0"):
+        clean_phone = "+234" + clean_phone[1:]
+    elif not clean_phone.startswith("+"):
+        clean_phone = "+" + clean_phone
+
+    body = f"Hello {name}! 🎉\n\nWelcome to the Heavenly Paint Limited Referral Program. We are thrilled to have you.\n\nColor your world with Shree."
+    Thread(target=send_async_twilio, args=(client, from_number, clean_phone, body)).start()
+
+def send_whatsapp_admin_alert(referer_name, referer_phone):
+    account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
+    auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
+    from_number = os.environ.get('TWILIO_WHATSAPP_NUMBER')
+    admin_number = os.environ.get('ADMIN_WHATSAPP_NUMBER') 
+
+    if not all([account_sid, auth_token, from_number, admin_number]):
+        print("Missing Twilio credentials or Admin Number.")
+        return
+
+    client = Client(account_sid, auth_token)
+    body = f"🚨 *New Referrer Application*\n\nName: {referer_name}\nPhone: {referer_phone}\n\nLog in to the Heavenly Paint dashboard to approve them."
+    Thread(target=send_async_twilio, args=(client, from_number, admin_number, body)).start()
+
+def notify_referer(referer, action, reason=None, amount=None):
+    """
+    Centralized helper to send branded emails to referrers based on their actions.
+    """
+    from flask import render_template, url_for, current_app
+    
+    if not hasattr(referer, 'email') or not referer.email:
+        print(f"Skipping email: No email address for referer {referer.name}")
+        return 
+
+    if action == "pending":
+        subject = "Application Received - Heavenly Paint Limited"
+        template = 'emails/referer_pending.html'
+        
+    elif action == "approved":
+        subject = "Your Account is Approved! 🎉"
+        template = 'emails/referer_approved.html'
+        
+    elif action == "rejected":
+        subject = "Update on your Application"
+        template = 'emails/referer_rejected.html'
+        
+    elif action == "withdrawal_request":
+        subject = "Withdrawal Request Received"
+        html_body = f"<h2>Withdrawal Initiated</h2><p>Hello {referer.name}, we have received your request to withdraw ₦{amount:,.2f}. It is currently being processed.</p>"
+        send_email(subject, [referer.email], html_body)
+        return
+
+    login_link = url_for('main.referer_login', _external=True)
+    html_body = render_template(template, name=referer.name, login_link=login_link, reason=reason)
+    send_email(subject, [referer.email], html_body)
 
 @bp.route("/")
 def index():
@@ -518,8 +649,10 @@ def apply_referer():
         full_name = request.form.get("full_name")
         whatsapp = request.form.get("whatsapp_number")
         bank_name = request.form.get("bank")
+        email = request.form.get("email")
         account_number = request.form.get("account_number")
         account_name = request.form.get("account_name")
+        
         existing = Referer.query.filter_by(whatsapp=whatsapp).first()
         if existing:
             flash("You have already applied.", "warning")
@@ -533,6 +666,7 @@ def apply_referer():
             whatsapp=whatsapp,
             bank_id=bank.id if bank else None,
             bank_name=bank_name,
+            email=email,
             account_number=account_number,
             account_name=account_name,
             status="pending",
@@ -543,6 +677,9 @@ def apply_referer():
         db.session.add(r)
         db.session.commit()
 
+        notify_referer(r, "pending")
+        send_whatsapp_welcome(r.whatsapp, r.name)
+        send_whatsapp_admin_alert(r.name, r.whatsapp)
         send_email(
             "New Referer Application",
             [current_app.config["MAIL_USERNAME"]],
@@ -574,14 +711,18 @@ def capture_ref():
 def referer_withdraw():
     data = request.get_json(force=True)
     token = data.get("token")
-    amount = int(data.get("amount", 0))
+    
+    try:
+        amount = int(data.get("amount", 0))
+    except ValueError:
+        return jsonify({"status": False, "message": "Invalid amount"}), 400
+        
     account = data.get("account")
 
     if not all([token, amount, account]):
         return jsonify({"status": False, "message": "All fields are required"}), 400
 
-
-    if amount < 20000:
+    if amount < 2000:
         return jsonify({"status": False, "message": "Minimum withdrawal is ₦2,000"}), 400
 
     r = Referer.query.filter_by(token=token, status="approved").first_or_404()
@@ -599,11 +740,12 @@ def referer_withdraw():
     )
     db.session.add(w)
     db.session.commit()
-
+    notify_referer(r, "withdrawal_request", amount=amount)
+    
     send_email(
-        "Withdrawal Request",
+        "Withdrawal Request - Heavenly Paint",
         [current_app.config["MAIL_USERNAME"]],
-        f"<p>{r.name} requested a withdrawal of ₦{amount/100:.2f}</p>"
+        f"<p>{r.name} requested a withdrawal of ₦{amount:,.2f}</p>"
     )
 
     return jsonify({"status": True, "message": "Withdrawal submitted"})
@@ -684,6 +826,7 @@ def admin_approve_referer(id):
     referer = Referer.query.get_or_404(id)
     referer.status = "approved"
     db.session.commit()
+    notify_referer(referer, "approved")
     flash(f"{referer.name} approved.", "success")
     return redirect(url_for("main.referer_requests"))
 
@@ -944,17 +1087,21 @@ def admin_tasks():
         title = request.form.get('title')
         description = request.form.get('description')
         staff_id = request.form.get('staff_id')
-
         new_task = Task(title=title, description=description, staff_id=staff_id)
         db.session.add(new_task)
         db.session.commit()
+        staff = Staff.query.get(staff_id)
+
+        if staff:
+            dashboard_link = url_for('main.staff_dashboard', _external=True) 
+            send_task_email(staff.email, staff.name, new_task.title, new_task.description, dashboard_link)
 
         flash('Task assigned successfully!', 'success')
         return redirect(url_for('main.admin_tasks'))
 
     staff_members = Staff.query.filter_by(verification_status='approved').all()
     tasks = Task.query.order_by(Task.created_at.desc()).all()
-
+    
     return render_template('admin/tasks.html', staff_members=staff_members, tasks=tasks)
 
 @bp.route('/admin/tasks/delete/<int:id>', methods=['POST'])
@@ -1332,8 +1479,10 @@ def staff_signup():
     if not settings or not settings.hiring_mode:
         flash("We are not currently accepting staff applications.", "error")
         return redirect(url_for('main.index'))
+
     if request.method == 'POST':
         data = request.form
+
         if Staff.query.filter_by(username=data['username']).first():
             flash("Username already exists. Please choose a different one.", "error")
             return redirect(url_for('main.staff_signup'))
@@ -1395,8 +1544,10 @@ def staff_signup():
         try:
             db.session.add(staff)
             db.session.commit()
-            flash("Registration successful. Please log in.", "success")
+            send_welcome_email(staff.email, staff.name, staff.role)
+            flash("Registration successful. Please check your email for confirmation.", "success")
             return redirect(url_for('main.staff_login'))
+
         except Exception as e:
             db.session.rollback()
             flash(f"There was an error saving your data: {str(e)}", "error")
@@ -1502,6 +1653,7 @@ def verify_staff(id):
     staff.verification_status = 'approved'
     staff.verified = True
     db.session.commit()
+    send_status_email(staff.email, staff.name, "approved")
     flash(f"{staff.name} has been approved.", "success")
     return redirect(url_for('main.staff_verification'))
 
@@ -1509,35 +1661,36 @@ def verify_staff(id):
 @bp.route('/admin/decline/<int:id>', methods=['POST'])
 def decline_staff(id):
     staff = Staff.query.get_or_404(id)
-    
     reason = request.form.get('reason')
-    
     staff.verification_status = 'declined'
     staff.verified = False
     staff.rejection_reason = reason
-    
     db.session.commit()
+    send_status_email(staff.email, staff.name, "declined", reason=reason)
     flash(f"{staff.name} has been declined.", "warning")
     return redirect(url_for('main.staff_verification'))
 
 
 @bp.route('/admin/delete/<int:id>', methods=['POST'])
 def delete_staff(id):
+    from app.models import Staff, Task
     staff = Staff.query.get_or_404(id)
     if staff.profile_image:
         path = os.path.join(current_app.static_folder, staff.profile_image)
         if os.path.exists(path):
             os.remove(path)
+
     if staff.documents:
         for doc in staff.documents.split(','):
             path = os.path.join(current_app.static_folder, doc)
             if os.path.exists(path):
                 os.remove(path)
 
+    Task.query.filter_by(staff_id=staff.id).delete()
     db.session.delete(staff)
     db.session.commit()
 
-    flash("Staff deleted successfully", "success")
+    flash("Staff and all associated tasks deleted successfully", "success")
     return redirect(url_for('main.staff_verification'))
 
 

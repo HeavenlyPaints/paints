@@ -13,7 +13,9 @@ def send_email(subject, recipients, html_body, text_body=None):
         current_app.logger.info("Mail server not configured; cannot send email.")
         return False
     try:
-        msg = EmailMessage(subject=subject, to=recipients, html=html_body)
+
+        msg = EmailMessage(subject=subject, to=recipients, body=html_body)
+        msg.content_subtype = "html" 
         msg.send()
         return True
     except Exception as e:

@@ -105,7 +105,7 @@ class Referer(db.Model):
     bank_name = db.Column(db.String(120))
     account_number = db.Column(db.String(20))
     account_name = db.Column(db.String(120))
-
+    email = db.Column(db.String(120))
 
 
 class Withdrawal(db.Model):
@@ -160,6 +160,7 @@ class Staff(db.Model, UserMixin):
     password_hash = db.Column(db.String(255), nullable=True)
     profile_image = db.Column(db.String(100), default='default_avatar.png')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    tasks = db.relationship('Task', back_populates='staff', cascade='all, delete-orphan', lazy=True)
 
     def __repr__(self):
         return f"<Staff {self.name} ({self.staff_id}) - Verified: {self.verified}>"
@@ -201,4 +202,4 @@ class Task(db.Model):
     status = db.Column(db.String(20), default='Pending')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     staff_id = db.Column(db.Integer, db.ForeignKey('staffs.id'), nullable=False)
-    staff = db.relationship('Staff', backref=db.backref('tasks', lazy=True))
+    staff = db.relationship('Staff', back_populates='tasks')

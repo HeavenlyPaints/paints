@@ -1,0 +1,19 @@
+<div style="font-family: sans-serif; max-width: 600px; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+    <h2 style="color: #007bff; margin-top: 0;">New Task Assigned</h2>
+    <p>Hello {{ name }},</p>
+    
+    <p>Management has assigned a new task to your profile at <strong>Heavenly Paint Limited</strong>.</p>
+    
+    <div style="background: #f8f9fa; padding: 15px; border-left: 4px solid #007bff; margin: 20px 0;">
+        <h3 style="margin-top: 0; color: #333;">{{ task_title }}</h3>
+        <p style="margin-bottom: 0; color: #555;">{{ task_desc }}</p>
+    </div>
+    
+    <p>Please log in to your dashboard to view the full details and update the status when complete.</p>
+    
+    <center style="margin: 30px 0;">
+        <a href="{{ task_link }}" style="background: #28a745; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Task in Dashboard</a>
+    </center>
+    
+    <p style="font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 15px;">Color your world with Shree.</p>
+</div>
