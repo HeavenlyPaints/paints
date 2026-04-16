@@ -55,7 +55,7 @@
       <div class="dashboard-card" style="text-align: left; padding: 25px;">
         
         {% if staff.profile_image %}
-            <img src="{% if staff.profile_image.startswith('data:') %}{{ staff.profile_image }}{% else %}{{ url_for('static', filename=staff.profile_image) }}{% endif %}" 
+            <img src="{% if staff.profile_image.startswith('http') or staff.profile_image.startswith('data:') %}{{ staff.profile_image }}{% else %}{{ url_for('static', filename=staff.profile_image) }}{% endif %}" 
                  style="float: left; width: 175px; height: 175px; border-radius: 50%; object-fit: cover; border: 3px solid #007bff; margin: 0 0 10px 20px; shape-outside: circle(50%);">
         {% else %}
             <img src="{{ url_for('static', filename='default_avatar.png') }}" 
