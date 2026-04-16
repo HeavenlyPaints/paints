@@ -8,6 +8,14 @@
     <label>Email </label><br>{{ form.email }}<br><br>
     <label>Phone </label><br>{{ form.phone }}<br><br>
     <div class="checkout-actions">
+    <div style="max-width: 350px; margin: 20px 0; padding: 15px; background-color: inherit; border: none; border-radius: 6px;">
+    <label style="display: flex; align-items: flex-start; cursor: pointer;">
+<input type="checkbox" name="subscribe" value="yes" checked style="width: 18px; height: 18px; margin-top: 2px; margin-right: 12px; flex-shrink: 0; accent-color: #1e3a8a;">
+        <span style="color: #334155; font-size: 14px; line-height: 1.5;">
+            <strong>Keep me updated!</strong> Send me alerts about new paint colors, restocks, and exclusive Heavenly Paint offers.
+        </span>
+    </label>
+</div>
       <button class="btn" type="submit">Pay with Paystack</button>
     </div>
   </form>
@@ -28,7 +36,7 @@
 {% endif %}
 <br>
 
-  Qty: {{ it.qty }} — ₦{{ "{:,.2f}".format(it.price * it.qty) }}
+  Qty: {{ it.qty }}<br> Price: ₦{{ "{:,.2f}".format(it.price * it.qty) }}
 </li>
 
       {% endfor %}

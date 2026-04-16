@@ -23,7 +23,7 @@ class Product(db.Model):
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
     price = db.Column(db.Integer, nullable=False)
-    image = db.Column(db.String(300))
+    image = db.Column(db.String(500))
     sold = db.Column(db.Integer, default=0)
     delivered = db.Column(db.Integer, default=0)
     unit = db.Column(db.String(20), default="pcs")
@@ -203,3 +203,12 @@ class Task(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     staff_id = db.Column(db.Integer, db.ForeignKey('staffs.id'), nullable=False)
     staff = db.relationship('Staff', back_populates='tasks')
+
+class Subscriber(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    opted_in_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_active = db.Column(db.Boolean, default=True) 
+
+    def __repr__(self):
+        return f"<Subscriber {self.email}>"

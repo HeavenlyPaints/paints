@@ -1,0 +1,20 @@
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+  
+  <div style="background-color: #1e3a8a; padding: 24px; text-align: center;">
+    <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Heavenly Paint Limited</h1>
+  </div>
+  
+  <div style="padding: 32px; color: #374151; line-height: 1.6; font-size: 16px;">
+    {{ message | safe }}
+  </div>
+  
+  <div style="background-color: #f9fafb; padding: 16px; text-align: center; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb;">
+    <p style="margin: 0 0 8px 0;"><em>Color your world with Shree.</em></p>
+    <p style="margin: 0 0 8px 0;">You are receiving this because you opted in during checkout.</p>
+    
+    <a href="{{ url_for('main.unsubscribe', email=email, _external=True) }}" style="color: #ef4444; text-decoration: underline;">
+      Unsubscribe from these emails
+    </a>
+  </div>
+
+</div>

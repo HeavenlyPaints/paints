@@ -5,6 +5,7 @@ import string
 import requests
 from .utils import generate_pickup_code
 import secrets
+from .models import Staff, Task
 from jinja2 import TemplateNotFound
 from flask import render_template, session, abort
 from flask_login import logout_user, login_required
@@ -28,6 +29,7 @@ from flask import Blueprint, render_template, current_app, request, redirect, ur
 from werkzeug.utils import secure_filename
 from . import db, login_manager
 from .models import Coupon
+from .models import Subscriber
 from .models import Admin, Product, Order, Referer, Withdrawal, Rating
 from .forms import AdminLoginForm, ProductForm, RefererApplyForm, CheckoutForm, WithdrawalForm, ChangeAdminForm
 from .utils import initialize_paystack, verify_paystack_transaction, validate_paystack_webhook, send_email
@@ -35,6 +37,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from sqlalchemy import func
 from datetime import datetime, timedelta
 import json
+from cloudinary.uploader import upload
 from flask import session,  abort
 from app.models import Staff
 import time
@@ -49,7 +52,6 @@ from .utils import (
     save_base64_image,
     save_multiple_files
 )
-
 from flask import Blueprint
 
 bp = Blueprint('main', __name__)
@@ -410,9 +412,7 @@ def checkout():
     applied_coupon = session.get('applied_coupon')
     if applied_coupon:
         discount_pct = applied_coupon.get('discount_pct', 0)
-        
         discount_amount = amount * (discount_pct / 100.0)
-        
         amount = amount - discount_amount
     amount_kobo = int(amount * 100)
 
@@ -429,7 +429,16 @@ def checkout():
             ref_token=ref_token
         )
         db.session.add(order)
-        db.session.commit()
+        wants_newsletter = request.form.get("subscribe") 
+
+        if wants_newsletter == "yes":
+            existing_sub = Subscriber.query.filter_by(email=form.email.data).first()
+            if not existing_sub:
+                new_sub = Subscriber(email=form.email.data, is_active=True)
+                db.session.add(new_sub)
+            elif not existing_sub.is_active:
+                existing_sub.is_active = True
+        db.session.commit() 
 
         callback = url_for("main.paystack_callback", _external=True)
 
@@ -1023,13 +1032,10 @@ def admin_dashboard():
     pending_withdrawals_count = Withdrawal.query.filter_by(status="pending").count()
     pending_orders_count = Order.query.filter_by(paid=True, delivered=False).count()
     pending_referers_count = len(pending_referers)
-
     chart_labels = []
     chart_data = []
-    
     today = datetime.utcnow().date()
     sales_dict = {(today - timedelta(days=i)): 0.0 for i in range(6, -1, -1)}
-
     seven_days_ago = today - timedelta(days=6)
     recent_orders = Order.query.filter(
         Order.paid == True, 
@@ -1044,7 +1050,7 @@ def admin_dashboard():
     for date_obj, total in sales_dict.items():
         chart_labels.append(date_obj.strftime("%b %d"))
         chart_data.append(total)
-
+        active_subscribers_count = Subscriber.query.filter_by(is_active=True).count()
     return render_template(
         "admin/dashboard.html",
         products=products,
@@ -1060,7 +1066,8 @@ def admin_dashboard():
         pending_orders_count=pending_orders_count,
         pending_referers_count=pending_referers_count,
         chart_labels=chart_labels,
-        chart_data=chart_data
+        chart_data=chart_data,
+        subscriber_count=active_subscribers_count
     )
 
 
@@ -1142,7 +1149,40 @@ def staff_complete_task(id):
         db.session.commit()
         flash('Task status updated!', 'success')
 
-    return redirect(url_for('main.staff_work'))
+    return redirect(url_for('main.staff_tasks'))
+
+@bp.route('/admin/broadcast', methods=['GET', 'POST'])
+@login_required
+def admin_broadcast():
+    if request.method == 'POST':
+        subject = request.form.get('subject')
+        raw_message = request.form.get('message')
+        formatted_message = raw_message.replace('\n', '<br>')
+        subscribers = Subscriber.query.filter_by(is_active=True).all()
+        if not subscribers:
+            flash("You don't have any active subscribers yet.", "warning")
+            return redirect(url_for('main.admin_broadcast'))
+        for sub in subscribers:
+            html_body = render_template('emails/broadcast.html', 
+                                        message=formatted_message, 
+                                        email=sub.email)
+            send_email(subject, [sub.email], html_body)
+        flash(f"Broadcast successfully queued for {len(subscribers)} subscribers!", "success")
+        return redirect(url_for('main.admin_broadcast'))
+    return render_template('admin_broadcast.html')
+
+@bp.route('/unsubscribe/<email>')
+def unsubscribe(email):
+    sub = Subscriber.query.filter_by(email=email).first()
+    if sub and sub.is_active:
+        sub.is_active = False
+        db.session.commit()
+        flash("You have been successfully unsubscribed from our mailing list.", "success")
+    elif sub and not sub.is_active:
+        flash("You are already unsubscribed.", "info")
+    else:
+        flash("We couldn't find your email in our subscriber list.", "warning")
+    return redirect(url_for('main.index'))
 
 @bp.route("/admin/profile")
 @login_required
@@ -1150,7 +1190,6 @@ def admin_profile():
     if current_user.username != 'admin':
         flash("Access denied.", "danger")
         return redirect(url_for('main.index'))
-        
     return render_template("admin/admin_profile.html")
 
 
@@ -1183,28 +1222,20 @@ def admin_change_password():
 def add_product():
     form = ProductForm()
     if form.validate_on_submit():
-        filename = None
+        image_url = None 
         f = form.image.data
         if f:
-            fname = secure_filename(f.filename)
-            path = os.path.join(current_app.config['UPLOAD_FOLDER'], fname)
-
-            img = Image.open(f)
-            img = img.convert("RGB")
-            img.thumbnail((1200, 1200))
-            img.save(path, optimize=True, quality=70)
-
-            filename = fname
-
+            upload_result = upload(f, width=1200, height=1200, crop="limit")
+            image_url = upload_result['secure_url']
         p = Product(
             name=form.name.data,
             description=form.description.data,
             price=form.price.data,
-            image=filename
+            image=image_url 
         )
         db.session.add(p)
         db.session.commit()
-        flash("Product added", "success")
+        flash("Product added to cloud storage", "success")
         return redirect(url_for("main.admin_dashboard"))
     return render_template("admin/add_product.html", form=form)
 
@@ -1273,33 +1304,25 @@ def about():
 def faqs():
     return render_template("faqs.html")
 
-
 @bp.route('/admin/edit_product/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_product(id):
     if current_user.username != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('main.index'))
-    
     product = Product.query.get_or_404(id)
-    
     if request.method == 'POST':
         product.name = request.form['name']
         product.description = request.form['description']
         product.price = request.form['price']
-        
         if 'image' in request.files:
-            image = request.files['image']
-            if image.filename != '':
-                fname = image.filename
-                path = os.path.join(current_app.config['UPLOAD_FOLDER'], fname)
-                image.save(path)
-                product.image = fname
-        
+            image_file = request.files['image']
+            if image_file.filename != '':
+                upload_result = upload(image_file, width=1200, height=1200, crop="limit")
+                product.image = upload_result['secure_url']
         db.session.commit()
         flash('Product updated successfully!', 'success')
         return redirect(url_for('main.admin_dashboard'))
-    
     return render_template('admin/edit_product.html', product=product)
 
 
@@ -1426,6 +1449,8 @@ def admin_delete_order(order_id):
 
     flash("Order permanently deleted from the database.", "success")
     return redirect(url_for("main.admin_orders"))
+
+
 
 
 @bp.route("/payment_confirmation/<reference>")
@@ -1638,8 +1663,16 @@ def staff_dashboard():
         return redirect(url_for('main.staff_login'))
 
     staff = Staff.query.get_or_404(session['staff_id'])
-    return render_template('staff/dashboard.html', staff=staff)
+    pending_tasks_count = Task.query.filter_by(
+        staff_id=staff.id,
+        status='Pending'
+    ).count()
 
+    return render_template(
+        'staff/dashboard.html',
+        staff=staff, 
+        pending_tasks_count=pending_tasks_count
+    )
 
 
 @bp.route('/admin/staff-verification')
@@ -1693,8 +1726,6 @@ def delete_staff(id):
     flash("Staff and all associated tasks deleted successfully", "success")
     return redirect(url_for('main.staff_verification'))
 
-
-
 @bp.route('/admin/export-staff-csv')
 def export_staff_csv():
     staffs = Staff.query.filter_by(verified=True).all()
@@ -1711,7 +1742,6 @@ def export_staff_csv():
         mimetype='text/csv',
         headers={'Content-Disposition':'attachment; filename=staff_payments.csv'}
     )
-
 
 
 @bp.route('/staff/work')

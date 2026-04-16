@@ -39,19 +39,27 @@
 }
 </style>
 
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-    <h2>Admin Dashboard</h2>
+<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 30px;">
+    <h2 style="margin: 0;">Admin Dashboard</h2>
     
-    <div style="display: flex; gap: 10px;">
-        <a class="btn" href="{{ url_for('main.admin_tasks') }}" style="background-color: #17a2b8; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; display: inline-block; margin: 5px;">
-    <i class="fa-solid fa-clipboard-list"></i> Manage Tasks
-</a>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+        <a class="btn" href="{{ url_for('main.admin_tasks') }}" style="background-color: #17a2b8; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; display: inline-block;">
+            <i class="fa-solid fa-clipboard-list"></i> Manage Tasks
+        </a>
         <a href="{{ url_for('main.admin_profile') }}" class="btn" style="background-color: #343a40; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; font-weight: bold;">
             <i class="fa-solid fa-gear"></i> Profile Settings
         </a>
         <form action="{{ url_for('main.admin_logout') }}" method="GET" style="margin: 0;">
-            <button type="submit" class="btn danger">Logout</button>
+            <button type="submit" class="btn btn-danger" style="padding: 10px 15px;">Logout</button>
         </form>
+        
+        <a href="{{ url_for('main.admin_broadcast') }}" class="d-inline-flex align-items-center text-decoration-none px-3 py-1 shadow-sm" style="background-color: #ecfdf5; color: #10b981; border: 1px solid #a7f3d0; border-radius: 50px; font-size: 14px; font-weight: 600; transition: 0.2s;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="me-2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            {{ subscriber_count }} <span class="d-none d-md-inline ms-1">Subscribers</span>
+        </a>
     </div>
 </div>
 
@@ -72,7 +80,7 @@
 
 <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px;">
     
-    <div class="dashboard-section" style="flex: 1; min-width: 300px; margin-bottom: 0;">
+    <div class="dashboard-section" style="flex: 1; min-width: 280px; margin-bottom: 0;">
         <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Hiring Control</h3>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
             <p style="margin: 0;">Status: 
@@ -89,16 +97,7 @@
         </div>
     </div>
 
-<div class="dashboard-section">
-    <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-        <i class="fa-solid fa-chart-area" style="color: #007bff;"></i> 7-Day Revenue Trend
-    </h3>
-    <div style="position: relative; height: 300px; width: 100%;">
-        <canvas id="salesChart"></canvas>
-    </div>
-</div>
-
-    <div class="dashboard-section" style="flex: 2; min-width: 350px; margin-bottom: 0;">
+    <div class="dashboard-section" style="flex: 2; min-width: 280px; margin-bottom: 0;">
         <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Quick Actions</h3>
         <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px;">
             <a class="btn btn-primary btn-relative" href="{{ url_for('main.add_product') }}">Add Product</a>
@@ -130,6 +129,15 @@
             <a class="btn btn-secondary btn-relative" style="background-color: #6c757d; color: white;" href="{{ url_for('main.export_staffs') }}">📥 Backup Staff</a>
             <a class="btn btn-secondary btn-relative" style="background-color: #6c757d; color: white;" href="{{ url_for('main.export_referrers') }}">📥 Backup Referrers</a>
         </div>
+    </div>
+</div>
+
+<div class="dashboard-section" style="width: 100%;">
+    <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+        <i class="fa-solid fa-chart-area" style="color: #007bff;"></i> 7-Day Revenue Trend
+    </h3>
+    <div style="position: relative; height: 300px; width: 100%;">
+        <canvas id="salesChart"></canvas>
     </div>
 </div>
 
@@ -307,7 +315,6 @@ function showPickupCode(code) {
         new Chart(ctx, {
             type: 'line',
             data: {
-                // Flask injects the lists directly into JavaScript
                 labels: {{ chart_labels | safe }},
                 datasets: [{
                     label: 'Revenue (₦)',
@@ -318,7 +325,7 @@ function showPickupCode(code) {
                     pointBackgroundColor: '#007bff',
                     pointRadius: 4,
                     fill: true,
-                    tension: 0.4 // This gives the line a smooth, elegant curve
+                    tension: 0.4
                 }]
             },
             options: {

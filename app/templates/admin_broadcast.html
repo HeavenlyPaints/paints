@@ -1,0 +1,55 @@
+{% extends "admin_base.html" %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 800px; margin: 0 auto;">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0" style="color: #0f172a; font-weight: 700; font-size: 24px;">
+            <i class="fa-solid fa-bullhorn me-2" style="color: #1e3a8a;"></i> Broadcast Hub
+        </h2>
+        <a href="{{ url_for('main.admin_dashboard') }}" class="btn btn-outline-secondary btn-sm" style="border-radius: 6px; font-weight: 600;">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm" style="border-radius: 10px; overflow: hidden;">
+        <div style="height: 4px; background-color: #1e3a8a; width: 100%;"></div>
+        
+        <div class="card-body p-4 p-md-5">
+            <div class="alert mb-4" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; color: #475569;">
+                <i class="fa-solid fa-circle-info text-primary me-2"></i>
+                This message will be dispatched to all <strong>active</strong> subscribers.
+            </div>
+
+            <form action="{{ url_for('main.admin_broadcast') }}" method="POST">
+                
+                <div class="mb-4">
+                    <label class="form-label" style="font-weight: 600; color: #334155; font-size: 15px;">Email Subject</label>
+                    <input type="text" name="subject" class="form-control form-control-lg" required 
+                           placeholder="e.g., New Silk Paint Colors Now Available!"
+                           style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 15px; box-shadow: none;">
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-end mb-2">
+                        <label class="form-label mb-0" style="font-weight: 600; color: #334155; font-size: 15px;">Message Body</label>
+                        <span class="text-muted" style="font-size: 12px; font-weight: 500;">
+                            <i class="fa-brands fa-html5 text-orange"></i> HTML Supported
+                        </span>
+                    </div>
+                    <textarea name="message" class="form-control" rows="12" required 
+                              placeholder="Type your message here... &#10;&#10;Pro tip: Use <br> to create a new line, or <b>bold text</b> to emphasize a sale."
+                              style="border-radius: 6px; border: 1px solid #cbd5e1; font-size: 15px; resize: vertical; padding: 15px; box-shadow: inherit;"></textarea>
+                </div>
+
+                <div class="d-flex justify-content-end mt-2">
+                    <button type="submit" class="btn px-4 py-2 shadow-sm" style="background-color: #1e3a8a; color: white; font-weight: 600; border-radius: 6px; transition: 0.2s;">
+                        <i class="fa-solid fa-paper-plane me-2"></i> Send Broadcast
+                    </button>
+                </div>
+            </form>
+            
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -52,23 +52,24 @@
   {% elif staff.verification_status == 'approved' %}
     <div class="dashboard-approved">
 
-      <div class="profile-box" style="text-align: center; margin-bottom: 20px;">
+      <div class="dashboard-card" style="text-align: left; padding: 25px;">
+        
         {% if staff.profile_image %}
             <img src="{% if staff.profile_image.startswith('data:') %}{{ staff.profile_image }}{% else %}{{ url_for('static', filename=staff.profile_image) }}{% endif %}" 
-                 style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #007bff;">
+                 style="float: left; width: 175px; height: 175px; border-radius: 50%; object-fit: cover; border: 3px solid #007bff; margin: 0 0 10px 20px; shape-outside: circle(50%);">
         {% else %}
             <img src="{{ url_for('static', filename='default_avatar.png') }}" 
-                 style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #ccc;">
+                 style="float: left; width: 175px; height: 175px; border-radius: 50%; object-fit: cover;  border: 3px solid #ccc; margin: 0 0 10px 20px; shape-outside: circle(50%);">
         {% endif %}
-      </div>
 
-      <div class="dashboard-card center">
-        <h2>Welcome {{ staff.username }}</h2>
+        <h2 style="margin-top: 0;">Welcome, {{ staff.username }}</h2>
 
-        <p><strong>Name:</strong> {{ staff.name }}</p>
-        <p><strong>Gender:</strong> {{ staff.gender }}</p>
-        <p><strong>Staff ID:</strong> {{ staff.staff_id }}</p>
-        <p><strong>Role:</strong> {{ staff.role }}</p>
+        <p style="line-height: 1.6; margin: 8px 0;"><strong>Name:</strong> {{ staff.name }}</p>
+        <p style="line-height: 1.6; margin: 8px 0;"><strong>Gender:</strong> {{ staff.gender }}</p>
+        <p style="line-height: 1.6; margin: 8px 0;"><strong>Staff ID:</strong> {{ staff.staff_id }}</p>
+        <p style="line-height: 1.6; margin: 8px 0;"><strong>Role:</strong> {{ staff.role }}</p>
+
+        <div style="clear: both;"></div>
 
         <div style="display: flex; flex-direction: column; gap: 10px; max-width: 250px; margin: 25px auto 0;">
             
@@ -81,10 +82,18 @@
                     <i class="fa-solid fa-user-gear"></i> Manage Profile
                 </button>
             </a>
-            <a href="{{ url_for('main.staff_tasks') }}" style="display: block; width: 100%; box-sizing: border-box; background-color: #28a745; color: white; margin-bottom: 10px; text-align: center; padding: 12px; text-decoration: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
+            
+            <a href="{{ url_for('main.staff_tasks') }}" style="position: relative; display: block; width: 100%; box-sizing: border-box; background-color: #28a745; color: white; margin-bottom: 10px; text-align: center; padding: 12px; text-decoration: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
     <i class="fa-solid fa-clipboard-check"></i> Open Task Board
+    
+    {% if pending_tasks_count and pending_tasks_count > 0 %}
+        <span style="position: absolute; top: -8px; right: -8px; background-color: #dc3545; color: white; border-radius: 50%; padding: 3px 8px; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 2px solid white;">
+            {{ pending_tasks_count }}
+        </span>
+    {% endif %}
 </a>
-            <form method="POST" action="{{ url_for('main.staff_logout') }}" style="width: 100%;">
+            
+            <form method="POST" action="{{ url_for('main.staff_logout') }}" style="width: 100%; margin: 0;">
                 <button class="btn danger" style="width: 100%;">Logout</button>
             </form>
             

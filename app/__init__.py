@@ -6,6 +6,8 @@ from flask_login import LoginManager
 from flask_mailman import Mail
 from dotenv import load_dotenv
 from config import Config
+import cloudinary
+import cloudinary.uploader
 
 load_dotenv()
 
@@ -27,6 +29,12 @@ def create_app():
         "pool_pre_ping": True,
         "pool_recycle": 300
     }
+    cloudinary.config( 
+    cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME'), 
+    api_key = os.getenv('CLOUDINARY_API_KEY'), 
+    api_secret = os.getenv('CLOUDINARY_API_SECRET'),
+    secure = True
+    )
 
     db.init_app(app)
     migrate.init_app(app, db)
