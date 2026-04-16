@@ -143,8 +143,6 @@ function confirmQuantity(){
 
   window.selectedQty = qty;
   window.selectedUnit = unit;
-
-  // USE the stored product ID (this is the key fix)
   openColorModal(qtyProductId, "Select Color");
 
   closeQtyModal();
@@ -248,13 +246,6 @@ window.closeColorModal = function(){
   selectedProductId = null;
   selectedColor = null;
 }
-
-//function closeColorModal(){
-//  document.getElementById('color-modal').style.display = 'none';
-//  selectedProductId = null;
-//  selectedColor = null;
-//}
-
 
 document.getElementById('color-input').addEventListener('input', async function(){
   const raw = this.value.trim();
@@ -475,23 +466,26 @@ document.addEventListener('DOMContentLoaded', function(){
       });
 
     function renderRatings(summary){
-      if(!summary) return;
-      document.getElementById('avg-rating').textContent = summary.average.toFixed(2);
-      document.getElementById('total-ratings').textContent = summary.total;
-      const ctx = document.getElementById('ratingsPie').getContext('2d');
+    if(!summary) return;
 
-      if(window._ratingsChart) { 
+    document.getElementById('avg-rating').textContent = summary.average.toFixed(2);
+    document.getElementById('total-ratings').textContent = summary.total;
+    const avg = Math.round(summary.average);
+    setStars(avg);
+    selected = avg;
+    const ctx = document.getElementById('ratingsPie').getContext('2d');
+    if(window._ratingsChart) { 
         window._ratingsChart.data.datasets[0].data = summary.values; 
         window._ratingsChart.update(); 
         return; 
-      }
-
-      window._ratingsChart = new Chart(ctx, {
-        type: 'pie',
-        data: { labels: summary.labels, datasets: [{ data: summary.values }] },
-        options: { responsive:true }
-      });
     }
+
+    window._ratingsChart = new Chart(ctx, {
+        type: 'pie',
+        data: { labels: summary.labels, datasets: [{ data: summary.values, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'] }] },
+        options: { responsive:true }
+    });
+}
   }
 
   document.querySelectorAll('.faq-question').forEach(q => {

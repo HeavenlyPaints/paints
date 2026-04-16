@@ -2,7 +2,16 @@
 {% block content %}
 <div class="product-page">
   <div class="product-left">
-    <img src="{{ url_for('main.uploaded_file', filename=product.image) if product.image else url_for('static', filename='uploads/placeholder.png') }}" alt="{{ product.name }}" class="product-image">
+    <img src="{% if product.image %}
+            {% if product.image.startswith('http') %}
+              {{ product.image }}
+            {% else %}
+              {{ url_for('main.uploaded_file', filename=product.image) }}
+            {% endif %}
+          {% else %}
+            {{ url_for('static', filename='uploads/placeholder.png') }}
+          {% endif %}" 
+     alt="{{ product.name }}" class="product-image">
   </div>
 
   <div class="product-right">
