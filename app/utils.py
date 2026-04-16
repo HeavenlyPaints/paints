@@ -7,19 +7,30 @@ from werkzeug.utils import secure_filename
 import uuid
 import random, string
 from datetime import datetime
+from threading import Thread
+
+def send_async_email(app, msg):
+    """This runs in the background so the user doesn't have to wait."""
+    with app.app_context():
+        try:
+            msg.send()
+        except Exception as e:
+            app.logger.error("Failed to send async email: %s", e)
 
 def send_email(subject, recipients, html_body, text_body=None):
     if not current_app.config.get("MAIL_USERNAME"):
         current_app.logger.info("Mail server not configured; cannot send email.")
         return False
-    try:
 
+    try:
         msg = EmailMessage(subject=subject, to=recipients, body=html_body)
         msg.content_subtype = "html" 
-        msg.send()
+        app = current_app._get_current_object()
+        Thread(target=send_async_email, args=(app, msg)).start()
+
         return True
     except Exception as e:
-        current_app.logger.error("Failed to send email: %s", e)
+        current_app.logger.error("Failed to queue email: %s", e)
         return False
 
 def initialize_paystack(reference, email, amount, callback):
