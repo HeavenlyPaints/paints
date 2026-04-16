@@ -53,19 +53,25 @@
 <section class="product-grid">
 {% for p in products %}
   <article class="card">
-    <img src="{{ url_for('main.uploaded_file', filename=p.image) if p.image else url_for('static', filename='uploads/placeholder.png') }}" alt="{{ p.name }}">
+    <img src="{% if p.image %}
+            {% if p.image.startswith('http') %}
+              {{ p.image }}
+            {% else %}
+              {{ url_for('main.uploaded_file', filename=p.image) }}
+            {% endif %}
+          {% else %}
+            {{ url_for('static', filename='uploads/placeholder.png') }}
+          {% endif %}" 
+     alt="{{ p.name }}">
     <h3>{{ p.name }}</h3>
     <div class="price">₦{{ "{:,.2f}".format(p.price) }}</div>
     <div class="card-actions">
-      <!-- Pass the correct product ID -->
       <button type="button" class="btn" onclick="openQtyModal('{{ p.id }}')">Add to Cart</button>
       <a href="{{ url_for('main.product', pid=p.id) }}" class="btn" style="text-decoration:none">Details</a>
     </div>
   </article>
  {% endfor %}
 </section>
-
-<!-- ================= QUANTITY MODAL ================= -->
 <div id="qty-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999;">
   <div style="background:#fff; width:400px; margin:120px auto; padding:20px; border-radius:8px;">
     <h3>Enter Quantity Needed</h3>
@@ -79,8 +85,6 @@
     <button type="button" class="btn" onclick="closeQtyModal()" style="background:#ccc;">Cancel</button>
   </div>
 </div>
-
-<!-- ================= COLOR MODAL ================= -->
 <div id="color-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000;">
   <div style="background:#fff; width:400px; margin:100px auto; padding:20px; border-radius:8px;">
     
@@ -124,8 +128,6 @@ function confirmQuantity(){
   window.selectedQty = qty;
   window.selectedUnit = unit;
   window.selectedProductId = qtyProductId;
-
-  // Instead of closing modal first:
   if(typeof openColorModal === "function"){
       openColorModal(qtyProductId, "Select Color");
       closeQtyModal();  // close after calling main.js
