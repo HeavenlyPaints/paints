@@ -227,11 +227,11 @@ def staff_required(role=None):
             staff_id = session.get('staff_id')
             if not staff_id:
                 flash("Please log in first.", "warning")
-                return redirect(url_for('main.staff_login'))
+                return redirect(url_for('main.staff_way'))
             staff = Staff.query.get(staff_id)
             if not staff:
                 flash("Staff not found.", "danger")
-                return redirect(url_for('main.staff_login'))
+                return redirect(url_for('main.staff_way'))
             if role and staff.role.lower() != role.lower():
                 flash("Access denied.", "danger")
                 return redirect(url_for('main.staff_dashboard'))
@@ -981,7 +981,7 @@ def admin_login():
             return redirect(url_for("main.admin_dashboard"))
         else:
             flash("Invalid username or password", "danger")
-            return redirect(url_for("main.admin_login"))
+            return redirect(url_for("main.admin_path"))
 
     return render_template("admin/login.html", form=form)
 
@@ -990,7 +990,7 @@ def admin_login():
 def admin_logout():
     logout_user()
     flash("Logged out successfully.", "success")
-    return redirect(url_for("main.admin_login"))
+    return redirect(url_for("main.admin_path"))
 
 @bp.after_request
 def add_no_cache_headers(response):
@@ -1129,7 +1129,7 @@ def admin_delete_task(id):
 def staff_tasks():
     if 'staff_id' not in session:
         flash("Your staff session expired. Please log in again.", "danger")
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
 
     from app.models import Task, Staff
     staff = Staff.query.get(session['staff_id'])
@@ -1140,7 +1140,7 @@ def staff_tasks():
 @bp.route('/staff/tasks/complete/<int:id>', methods=['POST'])
 def staff_complete_task(id):
     if 'staff_id' not in session: 
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
 
     from app.models import Task
     task = Task.query.get_or_404(id)
@@ -1571,7 +1571,7 @@ def staff_signup():
             db.session.commit()
             send_welcome_email(staff.email, staff.name, staff.role)
             flash("Registration successful. Please check your email for confirmation.", "success")
-            return redirect(url_for('main.staff_login'))
+            return redirect(url_for('main.staff_way'))
 
         except Exception as e:
             db.session.rollback()
@@ -1617,7 +1617,7 @@ def staff_forgot_password():
 
 
         flash("If the email exists, a reset link has been sent.")
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staf_way'))
 
     return render_template('staff/forgot_password.html')
 
@@ -1627,7 +1627,7 @@ def staff_reset_password(token):
 
     if not staff:
         flash("Invalid or expired reset link.", "danger")
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
 
     if staff.reset_token_expires < datetime.utcnow():
         flash("Reset link has expired.", "danger")
@@ -1651,7 +1651,7 @@ def staff_reset_password(token):
         db.session.commit()
 
         flash("Password has been reset successfully.", "success")
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
 
     return render_template('staff/reset_password.html', token=token)
 
@@ -1660,7 +1660,7 @@ def staff_reset_password(token):
 def staff_dashboard():
     if 'staff_id' not in session:
         flash("Please log in first.")
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
 
     staff = Staff.query.get_or_404(session['staff_id'])
     pending_tasks_count = Task.query.filter_by(
@@ -1748,7 +1748,7 @@ def export_staff_csv():
 def staff_work():
     if 'staff_id' not in session:
         flash("Please log in first.")
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
 
     staff = Staff.query.get_or_404(session['staff_id'])
 
@@ -1768,7 +1768,7 @@ def staff_profile():
 
     if 'staff_id' not in session:
         flash("Please log in first.", "error")
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
         
     staff = Staff.query.get_or_404(session['staff_id'])
     return render_template('staff/staff_profile.html', staff=staff)
@@ -1776,11 +1776,11 @@ def staff_profile():
 @bp.route('/staff/update-info', methods=['POST'])
 def staff_update_info():
     if 'staff_id' not in session:
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
         
     staff = Staff.query.get(session['staff_id'])
     if not staff:
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
 
     new_name = request.form.get('name')
     new_username = request.form.get('username')
@@ -1817,7 +1817,7 @@ def staff_update_info():
 @bp.route('/staff/change-password', methods=['POST'])
 def staff_change_password():
     if 'staff_id' not in session:
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
         
     staff = Staff.query.get(session['staff_id'])
     
@@ -1841,7 +1841,7 @@ def staff_change_password():
 def staff_logout():
     session.pop('staff_id', None)
     flash('You have been logged out successfully.')
-    return redirect(url_for('main.staff_login'))
+    return redirect(url_for('main.staff_way'))
 
 
 
@@ -2153,7 +2153,7 @@ def export_referrers():
 def staff_reapply():
     if 'staff_id' not in session:
         flash("Please log in first.")
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
 
     staff = Staff.query.get_or_404(session['staff_id'])
 
@@ -2215,7 +2215,7 @@ def emergency_reset(secret_key):
     return "Admin account not found.", 404
 @bp.before_request
 def block_old_doors():
-    locked_routes = ['/admin/login', '/staff_login'] 
+    locked_routes = ['/admin/login', '/staff/login'] 
     if request.path in locked_routes:
         abort(404)
 @bp.route('/tara', methods=['GET', 'POST'])
