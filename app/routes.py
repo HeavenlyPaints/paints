@@ -2213,3 +2213,14 @@ def emergency_reset(secret_key):
         db.session.commit()
         return "Emergency reset successful! You can now log in with the password: RescueMe2026!"
     return "Admin account not found.", 404
+@bp.before_request
+def block_old_doors():
+    locked_routes = ['/admin/login', '/staff_login'] 
+    if request.path in locked_routes:
+        abort(404)
+@bp.route('/tara', methods=['GET', 'POST'])
+def secret_admin_door():
+    return admin_login()
+@bp.route('/workers', methods=['GET', 'POST'])
+def secret_staff_door():
+    return staff_login()
