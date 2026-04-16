@@ -18,7 +18,8 @@
     <div class="mb-3">
       <label for="image" class="form-label">Change Image (optional)</label>
       <input type="file" name="image" id="image" class="form-control">
-      <img src="{{ url_for('static', filename='uploads/' + product.image) }}" alt="Product Image" width="150" class="mt-2">
+      <img src="{% if product.image.startswith('http') %}{{ product.image }}{% else %}{{ url_for('main.uploaded_file', filename=product.image) }}{% endif %}" 
+     alt="Product Image" width="150" class="mt-2">
     </div>
     <button type="submit" class="btn btn-primary">Update</button>
     <a href="{{ url_for('main.admin_dashboard') }}" class="btn btn-secondary">Cancel</a>
