@@ -1519,26 +1519,19 @@ def staff_signup():
         if Staff.query.filter_by(nin=data['nin']).first():
             flash("NIN already exists. Please check your NIN.", "error")
             return redirect(url_for('main.staff_signup'))
-
         profile_image = None
         if 'image' in data and data['image']:
-            profile_image = save_base64_image(data['image'])
-
+            upload_result = upload(data['image'], width=400, height=400, crop="fill", folder="staff_profiles")
+            profile_image = upload_result['secure_url']
         documents = None
         if 'documents' in request.files:
             files = request.files.getlist('documents')
             saved_docs = []
 
-            upload_dir = os.path.join(current_app.static_folder, "documents")
-            os.makedirs(upload_dir, exist_ok=True)
-
             for file in files:
                 if file and file.filename:
-                    filename = secure_filename(file.filename)
-                    rel_path = f"documents/{filename}"
-                    abs_path = os.path.join(current_app.static_folder, rel_path)
-                    file.save(abs_path)
-                    saved_docs.append(rel_path)
+                    doc_upload = upload(file, resource_type="auto", folder="staff_documents")
+                    saved_docs.append(doc_upload['secure_url'])
 
             if saved_docs:
                 documents = ",".join(saved_docs)
@@ -1571,7 +1564,7 @@ def staff_signup():
             db.session.commit()
             send_welcome_email(staff.email, staff.name, staff.role)
             flash("Registration successful. Please check your email for confirmation.", "success")
-            return redirect(url_for('main.staff_way'))
+            return redirect(url_for('main.staff_login'))
 
         except Exception as e:
             db.session.rollback()
@@ -1776,35 +1769,24 @@ def staff_profile():
 @bp.route('/staff/update-info', methods=['POST'])
 def staff_update_info():
     if 'staff_id' not in session:
-        return redirect(url_for('main.staff_way'))
-        
+        return redirect(url_for('main.staff_login'))
     staff = Staff.query.get(session['staff_id'])
     if not staff:
-        return redirect(url_for('main.staff_way'))
-
+        return redirect(url_for('main.staff_login'))
     new_name = request.form.get('name')
     new_username = request.form.get('username')
-
     if new_name:
         staff.name = new_name
-
     if new_username and new_username != staff.username:
         if Staff.query.filter_by(username=new_username).first():
             flash("That username is already taken.", "error")
             return redirect(url_for('main.staff_profile'))
         staff.username = new_username
-
     if 'profile_image' in request.files:
         file = request.files['profile_image']
         if file and file.filename != '':
-            ext = secure_filename(file.filename).rsplit('.', 1)[-1].lower()
-            timestamp = int(time.time())
-            filename = f"staff_{staff.id}_{timestamp}.{ext}"
-            upload_path = os.path.join(current_app.static_folder, 'uploads')
-            os.makedirs(upload_path, exist_ok=True)
-            file.save(os.path.join(upload_path, filename))
-            staff.profile_image = f"uploads/{filename}"
-
+            upload_result = upload(file, width=400, height=400, crop="fill", folder="staff_profiles")
+            staff.profile_image = upload_result['secure_url']
     try:
         db.session.commit()
         flash('Profile updated successfully!', 'success')
