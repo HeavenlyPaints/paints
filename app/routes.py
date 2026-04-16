@@ -2219,8 +2219,8 @@ def block_old_doors():
     if request.path in locked_routes:
         abort(404)
 @bp.route('/tara', methods=['GET', 'POST'])
-def secret_admin_door():
+def admin_path():
     return admin_login()
 @bp.route('/workers', methods=['GET', 'POST'])
-def secret_staff_door():
+def staff_way():
     return staff_login()
