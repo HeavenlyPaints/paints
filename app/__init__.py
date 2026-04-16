@@ -10,7 +10,12 @@ import cloudinary
 import cloudinary.uploader
 
 load_dotenv()
-
+cloudinary.config( 
+    cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME'), 
+    api_key = os.environ.get('CLOUDINARY_API_KEY'), 
+    api_secret = os.environ.get('CLOUDINARY_API_SECRET'),
+    secure = True
+)
 db = SQLAlchemy()
 migrate = Migrate()
 login_manager = LoginManager()
@@ -29,25 +34,15 @@ def create_app():
         "pool_pre_ping": True,
         "pool_recycle": 300
     }
-    cloudinary.config( 
-    cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME'), 
-    api_key = os.getenv('CLOUDINARY_API_KEY'), 
-    api_secret = os.getenv('CLOUDINARY_API_SECRET'),
-    secure = True
-    )
-
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
-
-    login_manager.login_view = "main.admin_login"
-
     mail.init_app(app)
+    login_manager.login_view = "main.admin_login"
 
     from .routes import bp as main_bp
     app.register_blueprint(main_bp)
-
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
 
     with app.app_context():
         from app.models import Admin
