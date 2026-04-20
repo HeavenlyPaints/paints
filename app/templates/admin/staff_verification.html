@@ -31,7 +31,7 @@
       <tr>
         <td>
           {% if staff.profile_image %}
-            <img src="{{ url_for('static', filename=staff.profile_image) }}"
+            <img src="{% if staff.profile_image.startswith('http') or staff.profile_image.startswith('data:') %}{{ staff.profile_image }}{% else %}{{ url_for('static', filename=staff.profile_image) }}{% endif %}"
                  style="width:60px;height:60px;border-radius:50%;cursor:pointer;object-fit:cover;"
                  onclick="openImageModal(this.src)"
                  title="Click to view image">

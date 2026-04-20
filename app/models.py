@@ -212,3 +212,10 @@ class Subscriber(db.Model):
 
     def __repr__(self):
         return f"<Subscriber {self.email}>"
+
+class Catalog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    image_url = db.Column(db.String(255), nullable=False)
+    show_on_home = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

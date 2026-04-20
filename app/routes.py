@@ -234,7 +234,7 @@ def staff_required(role=None):
                 return redirect(url_for('main.staff_way'))
             if role and staff.role.lower() != role.lower():
                 flash("Access denied.", "danger")
-                return redirect(url_for('main.staff_dashboard'))
+                return redirect(url_for('main.staff_hood'))
             return f(*args, staff=staff, **kwargs)
         return wrapper
     return decorator
@@ -856,7 +856,7 @@ def admin_delete_referer(id):
     db.session.commit()
 
     flash(f"Referrer {referer.name} has been permanently deleted.", "success")
-    return redirect(request.referrer or url_for('main.admin_dashboard'))
+    return redirect(request.referrer or url_for('main.admin_doe'))
 
 
 @bp.route("/admin/verify-pickup", methods=["POST"])
@@ -978,7 +978,7 @@ def admin_login():
 
         if admin and admin.check_password(form.password.data):
             login_user(admin)
-            return redirect(url_for("main.admin_dashboard"))
+            return redirect(url_for("main.admin_doe"))
         else:
             flash("Invalid username or password", "danger")
             return redirect(url_for("main.admin_path"))
@@ -1100,7 +1100,7 @@ def admin_tasks():
         staff = Staff.query.get(staff_id)
 
         if staff:
-            dashboard_link = url_for('main.staff_dashboard', _external=True) 
+            dashboard_link = url_for('main.staff_hood', _external=True) 
             send_task_email(staff.email, staff.name, new_task.title, new_task.description, dashboard_link)
 
         flash('Task assigned successfully!', 'success')
@@ -1231,12 +1231,12 @@ def add_product():
             name=form.name.data,
             description=form.description.data,
             price=form.price.data,
-            image=image_url 
+            image=image_url
         )
         db.session.add(p)
         db.session.commit()
         flash("Product added to cloud storage", "success")
-        return redirect(url_for("main.admin_dashboard"))
+        return redirect(url_for("main.admin_doe"))
     return render_template("admin/add_product.html", form=form)
 
 @bp.route("/admin/product/delete/<int:pid>", methods=["POST"])
@@ -1245,7 +1245,7 @@ def admin_delete_product(pid):
     p = Product.query.get_or_404(pid)
     db.session.delete(p); db.session.commit()
     flash("Product deleted", "info")
-    return redirect(url_for("main.admin_dashboard"))
+    return redirect(url_for("main.admin_doe"))
 
 @bp.route("/admin/referer-requests")
 @login_required
@@ -1322,7 +1322,7 @@ def edit_product(id):
                 product.image = upload_result['secure_url']
         db.session.commit()
         flash('Product updated successfully!', 'success')
-        return redirect(url_for('main.admin_dashboard'))
+        return redirect(url_for('main.admin_doe'))
     return render_template('admin/edit_product.html', product=product)
 
 
@@ -1337,7 +1337,7 @@ def delete_product(id):
     db.session.delete(product)
     db.session.commit()
     flash('Product deleted successfully!', 'success')
-    return redirect(url_for('main.admin_dashboard'))
+    return redirect(url_for('main.admin_doe'))
 
 
 @bp.route('/verify_account', methods=['POST'])
@@ -1428,7 +1428,7 @@ def admin_toggle_hiring():
         db.session.rollback()
         flash(f"Database error while toggling: {str(e)}", "error")
 
-    return redirect(url_for('main.admin_dashboard'))
+    return redirect(url_for('main.admin_doe'))
 
 
 @bp.route("/admin/order/<int:order_id>/delete", methods=["POST"])
@@ -1564,7 +1564,7 @@ def staff_signup():
             db.session.commit()
             send_welcome_email(staff.email, staff.name, staff.role)
             flash("Registration successful. Please check your email for confirmation.", "success")
-            return redirect(url_for('main.staff_login'))
+            return redirect(url_for('main.staff_way'))
 
         except Exception as e:
             db.session.rollback()
@@ -1580,7 +1580,7 @@ def staff_login():
 
         if staff and check_password_hash(staff.password, request.form['password']):
             session['staff_id'] = staff.id
-            return redirect(url_for('main.staff_dashboard'))
+            return redirect(url_for('main.staff_hood'))
 
         flash('Invalid credentials')
 
@@ -1747,7 +1747,7 @@ def staff_work():
 
     if staff.verification_status != "approved":
         flash("Your account is not approved yet.")
-        return redirect(url_for('main.staff_dashboard'))
+        return redirect(url_for('main.staff_hood'))
     if staff.role.lower() == "sales":
         return redirect(url_for('main.sales_dashboard'))
     template_path = f"roles/{staff.role.lower()}.html"
@@ -1769,10 +1769,10 @@ def staff_profile():
 @bp.route('/staff/update-info', methods=['POST'])
 def staff_update_info():
     if 'staff_id' not in session:
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
     staff = Staff.query.get(session['staff_id'])
     if not staff:
-        return redirect(url_for('main.staff_login'))
+        return redirect(url_for('main.staff_way'))
     new_name = request.form.get('name')
     new_username = request.form.get('username')
     if new_name:
@@ -1996,11 +1996,24 @@ def download_documents(staff_id):
 
     doc_list = staff.documents.split(',')
     memory_file = BytesIO()
+
     with zipfile.ZipFile(memory_file, 'w') as zf:
-        for doc_path in doc_list:
-            abs_path = os.path.join(current_app.static_folder, doc_path)
-            if os.path.exists(abs_path):
-                zf.write(abs_path, arcname=os.path.basename(abs_path))
+        for i, doc_path in enumerate(doc_list):
+            doc_path = doc_path.strip()
+            if doc_path.startswith('http'):
+                try:
+                    response = requests.get(doc_path)
+                    if response.status_code == 200:
+                        ext = doc_path.split('.')[-1] if '.' in doc_path[-5:] else 'pdf'
+                        filename = f"document_{i+1}.{ext}"
+                        zf.writestr(filename, response.content)
+                except Exception as e:
+                    print(f"Error downloading {doc_path}: {e}")
+            else:
+                abs_path = os.path.join(current_app.static_folder, doc_path)
+                if os.path.exists(abs_path):
+                    zf.write(abs_path, arcname=os.path.basename(abs_path))
+
     memory_file.seek(0)
 
     return send_file(
@@ -2140,7 +2153,7 @@ def staff_reapply():
     staff = Staff.query.get_or_404(session['staff_id'])
 
     if staff.verification_status != 'declined':
-        return redirect(url_for('main.staff_dashboard'))
+        return redirect(url_for('main.staff_hood'))
 
     if request.method == 'POST':
         if 'documents' in request.files:
@@ -2169,7 +2182,7 @@ def staff_reapply():
         db.session.commit()
 
         flash("Your application has been updated and re-submitted for review!", "success")
-        return redirect(url_for('main.staff_dashboard'))
+        return redirect(url_for('main.staff_hood'))
 
     return render_template('staff/reapply.html', staff=staff)
 
@@ -2197,7 +2210,7 @@ def emergency_reset(secret_key):
     return "Admin account not found.", 404
 @bp.before_request
 def block_old_doors():
-    locked_routes = ['/admin/login', '/staff/login'] 
+    locked_routes = ['/admin/login', '/staff/login', '/staff/dashboard', '/admin/dashboard'] 
     if request.path in locked_routes:
         abort(404)
 @bp.route('/tara', methods=['GET', 'POST'])
@@ -2206,3 +2219,10 @@ def admin_path():
 @bp.route('/workers', methods=['GET', 'POST'])
 def staff_way():
     return staff_login()
+@bp.route('/tara-hood', methods=['GET', 'POST'])
+def admin_doe():
+    return admin_dashboard()
+@bp.route('/workers-doe', methods=['GET', 'POST'])
+def staff_hood():
+    return staff_dashboard()
+
