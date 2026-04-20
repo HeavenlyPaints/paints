@@ -25,7 +25,8 @@
 
         .receipt-container {
             background-color: white;
-            width: 800px;
+            width: 100%; /* Changed from fixed 800px to 100% */
+            max-width: 800px; /* Added max-width */
             padding: 40px;
             box-shadow: 0 0 15px rgba(0,0,0,0.5);
             box-sizing: border-box;
@@ -36,6 +37,7 @@
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 20px;
+            gap: 20px; /* Added gap for when things wrap */
         }
 
         .logo-title-group {
@@ -55,6 +57,7 @@
             align-items: center;
             font-size: 28px;
             font-weight: bold;
+            flex-shrink: 0; /* Prevents logo from squishing on mobile */
         }
 
         .company-name {
@@ -86,6 +89,7 @@
             font-weight: 600;
             margin-top: 15px;
             line-height: 1.6;
+            word-break: break-word; /* Prevents long emails from breaking mobile */
         }
 
         .contact-info i {
@@ -104,6 +108,7 @@
             font-size: 16px;
             margin-bottom: 5px;
             letter-spacing: 1px;
+            word-break: break-all; /* Allows long reference numbers to wrap */
         }
 
         .info-tables-container {
@@ -138,9 +143,18 @@
         .client-table td:first-child { width: 30%; }
         .payment-table td:first-child { width: 15%; text-align: center; }
 
+        /* Wrapper to make the items table horizontally scrollable on small screens */
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 0;
+        }
+
         .items-table {
             margin-bottom: 0;
             border-bottom: none;
+            min-width: 500px; /* Ensures the table doesn't squish too much before scrolling */
         }
 
         .items-table th {
@@ -161,6 +175,7 @@
         .col-desc { width: 47%; }
         .col-rate { width: 15%; text-align: right; }
         .col-amt { width: 30%; text-align: right; }
+        
         .footer-section {
             display: flex;
             justify-content: space-between;
@@ -204,10 +219,60 @@
             font-size: 16px;
             text-transform: uppercase;
         }
+
+        /* Responsive Media Queries for Mobile and Tablets */
+        @media screen and (max-width: 768px) {
+            body { padding: 10px; }
+            .receipt-container { padding: 20px; }
+            
+            .header {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+            
+            .logo-title-group {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .meta-info {
+                text-align: center;
+            }
+            
+            .info-tables-container {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .info-section { width: 100%; }
+            
+            .footer-section {
+                flex-direction: column-reverse; /* Puts Total on top, signatures below on mobile */
+                gap: 30px;
+            }
+            
+            .signatures, .summary-table-container {
+                width: 100%;
+            }
+            
+            .company-name { font-size: 26px; }
+            td, th { font-size: 12px; padding: 5px; }
+        }
+
         @media print {
             body { background-color: white; padding: 0; }
             .receipt-container { box-shadow: none; width: 100%; padding: 20px; }
             .no-print { display: none; }
+            
+            /* Enforce desktop layout for printing */
+            .header, .info-tables-container, .footer-section { flex-direction: row; align-items: flex-start; }
+            .info-section { width: 48%; }
+            .signatures { width: 50%; }
+            .summary-table-container { width: 45%; }
+            .items-table { min-width: auto; }
+            .logo-title-group { flex-direction: row; text-align: left; }
+            .meta-info { text-align: right; }
         }
     </style>
 </head>
@@ -224,10 +289,10 @@
         <div class="header">
             <div>
                 <div class="logo-title-group">
-                    <div class="logo">∞</div>
+                    <div class="logo">∞<br>heavenlypaints</div>
                     <div>
                         <h1 class="company-name">HEAVENLY<br>PAINT LIMITED</h1>
-                        <div class="company-slogan">Color your world with shree</div>
+                        <div class="company-slogan">All colors starts with You</div>
                     </div>
                 </div>
                 <div class="contact-info">
@@ -272,39 +337,41 @@
             </div>
         </div>
 
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th class="col-qty">QTY</th>
-                    <th class="col-desc">GOODS DESCRIPTION</th>
-                    <th class="col-rate">RATE (₦)</th>
-                    <th class="col-amt">AMOUNT (₦)</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in order.order_items %}
-                    {% set unit_price = (item.product.price / 20) if item.unit == 'liters' else item.product.price %}
-                    {% set row_total = unit_price * item.quantity %}
-                    
+        <div class="table-responsive">
+            <table class="items-table">
+                <thead>
                     <tr>
-                        <td class="col-qty">{{ item.quantity }}</td>
-                        <td class="col-desc">
-                            {{ item.product.name }} 
-                            {% if item.color_name %}(Color: {{ item.color_name }}){% endif %}
-                            [{{ item.unit | title }}]
-                        </td>
-                        <td class="col-rate">{{ "{:,.2f}".format(unit_price) }}</td>
-                        <td class="col-amt">{{ "{:,.2f}".format(row_total) }}</td>
+                        <th class="col-qty">QTY</th>
+                        <th class="col-desc">GOODS DESCRIPTION</th>
+                        <th class="col-rate">RATE (₦)</th>
+                        <th class="col-amt">AMOUNT (₦)</th>
                     </tr>
-                {% endfor %}
-                
-                {% for i in range(10 - order.order_items|length) %}
-                    {% if i > 0 %}
-                        <tr><td></td><td></td><td></td><td></td></tr>
-                    {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for item in order.order_items %}
+                        {% set unit_price = (item.product.price / 20) if item.unit == 'liters' else item.product.price %}
+                        {% set row_total = unit_price * item.quantity %}
+                        
+                        <tr>
+                            <td class="col-qty">{{ item.quantity }}</td>
+                            <td class="col-desc">
+                                {{ item.product.name }} 
+                                {% if item.color_name %}(Color: {{ item.color_name }}){% endif %}
+                                [{{ item.unit | title }}]
+                            </td>
+                            <td class="col-rate">{{ "{:,.2f}".format(unit_price) }}</td>
+                            <td class="col-amt">{{ "{:,.2f}".format(row_total) }}</td>
+                        </tr>
+                    {% endfor %}
+                    
+                    {% for i in range(10 - order.order_items|length) %}
+                        {% if i > 0 %}
+                            <tr><td></td><td></td><td></td><td></td></tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
         <div class="footer-section">
             <div class="signatures">

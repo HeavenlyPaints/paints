@@ -617,8 +617,8 @@ def admin_manual_order():
             price_per_unit = float(product.price)
 
         total_amount = price_per_unit * qty
-        reference = f"HPL-{uuid.uuid4().hex[:8].upper()}"
-        unique_pickup = f"WALK-{uuid.uuid4().hex[:6].upper()}"
+        reference = f"HP-{uuid.uuid4().hex[:7].upper()}"
+        unique_pickup = f"WK-{uuid.uuid4().hex[:7].upper()}"
 
         order = Order(
             reference=reference,
