@@ -197,8 +197,12 @@ def notify_referer(referer, action, reason=None, amount=None):
 @bp.route("/")
 def index():
     from app.models import Product, Catalog
+    try:
+        products = Product.query.filter_by(is_active=True).order_by(Product.created_at.desc()).all()
+    except Exception:
+        db.session.rollback()
+        products = Product.query.order_by(Product.created_at.desc()).all()
 
-    products = Product.query.filter_by(is_active=True).order_by(Product.created_at.desc()).all()
     total_ordered = db.session.query(func.sum(Product.sold)).scalar() or 0
     total_delivered = db.session.query(func.sum(Product.delivered)).scalar() or 0
     featured_projects = Catalog.query.filter_by(show_on_home=True).order_by(Catalog.created_at.desc()).all()

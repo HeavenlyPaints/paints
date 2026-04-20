@@ -40,21 +40,21 @@
 #    port = int(os.environ.get("PORT", 5000))
 #    app.run(host="0.0.0.0", port=port)
 
-from app import create_app, db
-from flask_migrate import upgrade, stamp
 import os
+from app import create_app, db
+from sqlalchemy import text
 
 app = create_app()
 
-if __name__ == "__main__":
-    with app.app_context():
-        try:
-            print("Checking database migrations...")
-            stamp() 
-            upgrade()
-            print("Database is up to date!")
-        except Exception as e:
-            print(f"Migration skipped or already done: {e}")
+with app.app_context():
+    try:
+        db.session.execute(text('ALTER TABLE product ADD COLUMN is_active BOOLEAN DEFAULT TRUE'))
+        db.session.commit()
+        print("Successfully added missing is_active column.")
+    except Exception as e:
+        db.session.rollback()
+        print("Database structure is already correct.")
 
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
