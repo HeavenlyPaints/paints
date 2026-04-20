@@ -156,16 +156,21 @@
             </thead>
             <tbody>
                 {% for product in products %}
-                <tr>
+                <tr style="{% if not product.is_active %}opacity: 0.1; background-color: #f8f9fa;{% endif %}">
                     <td>{{ product.name }}</td>
                     <td>{{ product.description }}</td>
                     <td>₦{{ "{:,.2f}".format(product.price) }}</td>
                     <td>
-                        <a class="btn btn-warning btn-sm" style="text-decoration:none" href="{{ url_for('main.edit_product', id=product.id) }}">Edit</a>
-                        <form action="{{ url_for('main.delete_product', id=product.id) }}" method="POST" style="display:inline;">
-                            <button type="submit" style="text-decoration:none" class="btn btn-danger btn-sm" onclick="return confirm('Delete this product?');">Delete</button>
-                        </form>
-                    </td>
+    <a class="btn btn-warning btn-sm" style="text-decoration:none" href="{{ url_for('main.edit_product', id=product.id) }}">Edit</a>
+    
+    <form action="{{ url_for('main.toggle_product', id=product.id) }}" method="POST" style="display:inline;">
+        {% if product.is_active %}
+            <button type="submit" class="btn btn-sm" style="background-color: #ffc107; color: black; border: none;" onclick="return confirm('Hide this product from the public store?');">Archive</button>
+        {% else %}
+            <button type="submit" class="btn btn-success btn-sm" style="border: none;">Restore</button>
+        {% endif %}
+    </form>
+</td>
                 </tr>
                 {% endfor %}
             </tbody>

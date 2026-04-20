@@ -26,6 +26,7 @@ class Product(db.Model):
     image = db.Column(db.String(500))
     sold = db.Column(db.Integer, default=0)
     delivered = db.Column(db.Integer, default=0)
+    is_active = db.Column(db.Boolean, default=True)
     unit = db.Column(db.String(20), default="pcs")
     product_type = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

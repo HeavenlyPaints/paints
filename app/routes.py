@@ -196,16 +196,17 @@ def notify_referer(referer, action, reason=None, amount=None):
 
 @bp.route("/")
 def index():
-    from app.models import Product
+    from app.models import Product, Catalog
 
-
-    products = Product.query.order_by(Product.created_at.desc()).all()
+    products = Product.query.filter_by(is_active=True).order_by(Product.created_at.desc()).all()
     total_ordered = db.session.query(func.sum(Product.sold)).scalar() or 0
     total_delivered = db.session.query(func.sum(Product.delivered)).scalar() or 0
+    featured_projects = Catalog.query.filter_by(show_on_home=True).order_by(Catalog.created_at.desc()).all()
 
     return render_template(
         "index.html",
         products=products,
+        featured_projects=featured_projects,
         total_ordered=total_ordered,
         total_delivered=total_delivered,
         paystack_public=current_app.config.get("PAYSTACK_PUBLIC"),
@@ -1326,19 +1327,38 @@ def edit_product(id):
     return render_template('admin/edit_product.html', product=product)
 
 
-@bp.route('/admin/delete_product/<int:id>', methods=['POST'])
+#@bp.route('/admin/delete_product/<int:id>', methods=['POST'])
+#@login_required
+#def delete_product(id):
+#    if current_user.username != 'admin':
+#        flash('Access denied.', 'danger')
+#        return redirect(url_for('main.index'))
+    
+#    product = Product.query.get_or_404(id)
+#    db.session.delete(product)
+#    db.session.commit()
+#    flash('Product deleted successfully!', 'success')
+#    return redirect(url_for('main.admin_doe'))
+@bp.route('/admin/product/toggle/<int:id>', methods=['POST'])
 @login_required
-def delete_product(id):
+def toggle_product(id):
     if current_user.username != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('main.index'))
     
+    from app.models import Product
     product = Product.query.get_or_404(id)
-    db.session.delete(product)
+    
+    # Flip the switch: Active becomes Inactive, and vice versa
+    product.is_active = not product.is_active
+    from app import db
     db.session.commit()
-    flash('Product deleted successfully!', 'success')
+    
+    status = "restored to the public store" if product.is_active else "archived (hidden from the public store)"
+    flash(f'Product "{product.name}" has been {status}.', 'success')
+    
+    # Redirect back to your secret admin dashboard route
     return redirect(url_for('main.admin_doe'))
-
 
 @bp.route('/verify_account', methods=['POST'])
 def verify_account():
