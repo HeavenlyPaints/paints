@@ -2246,3 +2246,13 @@ def admin_doe():
 def staff_hood():
     return staff_dashboard()
 
+@bp.route('/emergency-db-fix')
+def emergency_db_fix():
+    if not current_user.is_authenticated or current_user.username != 'admin':
+        return "Access Denied", 403
+    try:
+        flask_migrate.stamp()
+        flask_migrate.upgrade()
+        return "Database stamped and upgraded successfully! You can now delete this route."
+    except Exception as e:
+        return f"Error: {str(e)}"
