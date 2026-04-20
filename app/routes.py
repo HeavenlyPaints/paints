@@ -2260,3 +2260,76 @@ def emergency_db_fix():
         return "Database stamped and upgraded successfully! You can now delete this route."
     except Exception as e:
         return f"Error: {str(e)}"
+# --- PUBLIC CATALOG ROUTE ---
+@bp.route('/catalog')
+def public_catalog():
+    # Fetch all catalog items, newest first
+    from app.models import Catalog
+    projects = Catalog.query.order_by(Catalog.created_at.desc()).all()
+    return render_template('catalog.html', projects=projects)
+
+
+# --- ADMIN CATALOG MANAGEMENT ---
+@bp.route('/admin/catalog', methods=['GET', 'POST'])
+@login_required
+def admin_catalog():
+    if current_user.username != 'admin':
+        flash('Access denied.', 'danger')
+        return redirect(url_for('main.index'))
+        
+    from app.models import Catalog
+    
+    if request.method == 'POST':
+        title = request.form.get('title')
+        description = request.form.get('description')
+        image_file = request.files.get('image')
+        
+        if not title or not image_file:
+            flash("Title and Image are required.", "danger")
+            return redirect(request.url)
+            
+        try:
+            # Professional Cloudinary Upload: Auto-format and optimize for web
+            upload_result = upload(
+                image_file, 
+                folder="heavenly_catalog", 
+                width=1080, 
+                height=1080, 
+                crop="limit",
+                fetch_format="auto",
+                quality="auto"
+            )
+            
+            new_project = Catalog(
+                title=title,
+                description=description,
+                image=upload_result['secure_url'],
+                image_url=upload_result['secure_url'],
+                show_on_home=True
+            )
+            db.session.add(new_project)
+            db.session.commit()
+            flash("Project added to catalog successfully!", "success")
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error uploading image: {str(e)}", "danger")
+            
+        return redirect(url_for('main.admin_catalog'))
+        
+    projects = Catalog.query.order_by(Catalog.created_at.desc()).all()
+    return render_template('admin/catalog.html', projects=projects)
+
+@bp.route('/admin/catalog/delete/<int:id>', methods=['POST'])
+@login_required
+def admin_delete_catalog(id):
+    if current_user.username != 'admin':
+        return redirect(url_for('main.index'))
+        
+    from app.models import Catalog
+    project = Catalog.query.get_or_404(id)
+    
+    db.session.delete(project)
+    db.session.commit()
+    flash("Project removed from catalog.", "info")
+    return redirect(url_for('main.admin_catalog'))

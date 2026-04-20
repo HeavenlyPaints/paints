@@ -121,7 +121,8 @@
                 Manage Orders
                 {% if pending_orders_count > 0 %}<span class="notify-badge">{{ pending_orders_count }}</span>{% endif %}
             </a>
-
+             <a href="{{ url_for('main.admin_catalog') }}" class="btn btn-primary btn-relative"> Manage Project Catalog
+            </a>
             <a class="btn btn-primary btn-relative" href="{{ url_for('main.admin_manual_order') }}">Manual Sales</a>
             <a class="btn btn-success btn-relative" href="{{ url_for('main.admin_coupons') }}">Manage Coupons</a>
             <a class="btn btn-primary btn-relative" href="{{ url_for('main.verify_pickup_page') }}">Verify Pickup Code</a>

@@ -209,7 +209,7 @@ class Subscriber(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     opted_in_at = db.Column(db.DateTime, default=datetime.utcnow)
-    is_active = db.Column(db.Boolean, default=True) 
+    is_active = db.Column(db.Boolean, default=True)
 
     def __repr__(self):
         return f"<Subscriber {self.email}>"
@@ -220,3 +220,5 @@ class Catalog(db.Model):
     image_url = db.Column(db.String(255), nullable=False)
     show_on_home = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    description = db.Column(db.Text, nullable=True)
+    image = db.Column(db.String(255), nullable=True)
