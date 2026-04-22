@@ -222,3 +222,10 @@ class Catalog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     description = db.Column(db.Text, nullable=True)
     image = db.Column(db.String(255), nullable=True)
+
+class BiometricCredential(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    referer_id = db.Column(db.Integer, db.ForeignKey('referer.id'), nullable=False)
+    credential_id = db.Column(db.LargeBinary, unique=True, nullable=False)
+    public_key = db.Column(db.LargeBinary, nullable=False)
+    sign_count = db.Column(db.Integer, default=0)

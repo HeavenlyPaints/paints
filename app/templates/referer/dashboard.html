@@ -1,6 +1,8 @@
 {% extends "referer_base.html" %}
 
 {% block content %}
+<script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+
 <h2 style="display:flex; align-items:center; gap:10px;">
     Welcome, {{ referrer.name }} 🎉
     {% if badge %}
@@ -8,6 +10,16 @@
              alt="{{ badge }}" style="height:90px ">
     {% endif %}
 </h2>
+
+<hr>
+
+<div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd;">
+    <h3 style="margin-top: 0;"><i class="fa-solid fa-shield-halved"></i> Security Settings</h3>
+    <p style="font-size: 14px; color: #555;">Lock your withdrawals to this device using your Fingerprint, FaceID, or Device PIN. <strong>You must do this before withdrawing.</strong></p>
+    <button class="btn" style="background-color: #333; color: white;" onclick="setupFingerprint('{{ referrer.token }}')">
+        <i class="fa-solid fa-fingerprint"></i> Setup Device Security
+    </button>
+</div>
 
 <hr>
 
@@ -46,11 +58,10 @@
     <li>📈 <strong>Commission Rate:</strong> {{ pct }}%</li>
     <li>💵 <strong>Total Withdrawn:</strong> ₦{{ "{:,.2f}".format(total_withdrawn) }}</li>
     <li>⏳ <strong>Pending Withdrawal:</strong> ₦{{ "{:,.2f}".format(pending_withdraw) }}</li>
-    <li>🗓️ <strong>Withdrawn This Month:</strong> ₦{{ "{:,.2f}".format(monthly_withdrawn) }}</li>
+    <li>🗓 <strong>Withdrawn This Month:</strong> ₦{{ "{:,.2f}".format(monthly_withdrawn) }}</li>
 </ul>
 
 <hr>
-
 
 <h3>Generate Referral Link</h3>
 <button class="btn" onclick="generateReferral('{{ referrer.token }}')">Generate Link</button>
@@ -58,11 +69,23 @@
 
 <hr>
 <h3>Withdraw Earnings</h3>
+<p style="font-size: 13px; color: #dc3545;">* Instant payouts require fingerprint verification or manual fallback.</p>
+
 <form id="withdraw-form" onsubmit="requestWithdraw(event, '{{ referrer.token }}')">
     <label>Withdrawal Amount (₦)</label>
-    <input type="number" id="withdraw-amount" min="1" required>
-    <button type="submit" class="btn">Withdraw</button>
+    <input type="number" id="withdraw-amount" min="2000" required placeholder="Min ₦2,000">
+    <button type="submit" class="btn" style="background-color: #28a745;">
+        <i class="fa-solid fa-bolt"></i> Instant Withdraw
+    </button>
 </form>
+
+<div id="password-fallback" style="display: none; margin-top: 15px; padding: 15px; border: 1px solid #ffc107; background-color: #fff8e5; border-radius: 8px;">
+    <p style="color: #856404; font-size: 14px; margin-top: 0;"><strong>Biometrics not supported or canceled.</strong> Please enter your registered WhatsApp number to authorize this withdrawal.</p>
+    <input type="text" id="fallback-password" class="form-control" placeholder="e.g. 08012345678">
+    <button onclick="requestPasswordWithdraw('{{ referrer.token }}')" class="btn" style="background-color: #ffc107; color: #000; margin-top: 10px; width: 100%;">
+        Verify & Withdraw
+    </button>
+</div>
 
 <script>
 function generateReferral(token) {
@@ -77,22 +100,104 @@ function generateReferral(token) {
         });
 }
 
-function requestWithdraw(e, token) {
+async function setupFingerprint(token) {
+    try {
+        const resp = await fetch('/api/referer/fingerprint/setup/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token })
+        });
+        const json = await resp.json();
+        
+        if (!json.options) return alert("Setup failed: " + (json.message || "Unknown error"));
+        const { startRegistration } = SimpleWebAuthnBrowser;
+        const biometricResult = await startRegistration(json.options);
+        const verifyResp = await fetch('/api/referer/fingerprint/setup/finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token, credential: biometricResult })
+        });
+        
+        const verifyJson = await verifyResp.json();
+        alert(verifyJson.message);
+        
+    } catch (error) {
+        console.error(error);
+        alert("Setup canceled or your device does not support biometrics/PIN lock.");
+    }
+}
+
+async function requestWithdraw(e, token) {
     e.preventDefault();
     const amount_naira = parseFloat(document.getElementById('withdraw-amount').value);
-    const amount_kobo = Math.round(amount_naira * 100);
+    
+    if (amount_naira < 2000) return alert("Minimum withdrawal is ₦2,000");
 
-    fetch('/referer/withdraw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: token, amount: amount_naira, account: '{{ referrer.account_name }}' })
-    })
-    .then(r => r.json())
-    .then(d => {
-        alert(d.message || "Withdrawal submitted");
-        location.reload();
-    });
+    try {
+        const resp = await fetch('/api/referer/withdraw/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token, amount: amount_naira })
+        });
+        
+        const json = await resp.json();
+        
+        if (!json.options) {
+            return alert(json.message); 
+        }
+
+        const { startAuthentication } = SimpleWebAuthnBrowser;
+        const authResult = await startAuthentication(json.options);
+        const verifyResp = await fetch('/api/referer/withdraw/finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token, credential: authResult })
+        });
+        
+        const verifyJson = await verifyResp.json();
+        alert(verifyJson.message);     
+        if(verifyJson.status) {
+            location.reload();
+        }
+        
+    } catch (error) {
+        console.warn("Fingerprint canceled or unsupported. Triggering fallback.", error);
+        document.getElementById('password-fallback').style.display = 'block';
+    }
+}
+
+async function requestPasswordWithdraw(token) {
+    const amount_naira = parseFloat(document.getElementById('withdraw-amount').value);
+    const password = document.getElementById('fallback-password').value;
+    
+    if (!password) return alert("Please enter your registered WhatsApp number.");
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerText = "Processing...";
+
+    try {
+        const resp = await fetch('/api/referer/withdraw/password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token, amount: amount_naira, password: password })
+        });
+        
+        const json = await resp.json();
+        alert(json.message);
+        
+        if (json.status) {
+            location.reload();
+        } else {
+            btn.disabled = false;
+            btn.innerText = "Verify & Withdraw";
+        }
+    } catch (error) {
+        console.error(error);
+        alert("Network error. Please try again.");
+        btn.disabled = false;
+        btn.innerText = "Verify & Withdraw";
+    }
 }
 </script>
 {% endblock %}
-

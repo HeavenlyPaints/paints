@@ -44,6 +44,19 @@ import time
 from werkzeug.security import generate_password_hash, check_password_hash
 import base64
 from .utils import save_base64_image
+from webauthn import (
+    generate_registration_options, 
+    verify_registration_response,
+    generate_authentication_options, 
+    verify_authentication_response,
+    options_to_json
+)
+from webauthn.helpers.structs import PublicKeyCredentialDescriptor
+import base64
+
+RP_ID = os.environ.get("RP_ID", "localhost") 
+RP_NAME = "Heavenly Paint Limited"
+EXPECTED_ORIGIN = f"https://{RP_ID}" if RP_ID != "localhost" else "http://localhost:5000"
 from .utils import (
     initialize_paystack,
     verify_paystack_transaction,
@@ -194,6 +207,40 @@ def notify_referer(referer, action, reason=None, amount=None):
     html_body = render_template(template, name=referer.name, login_link=login_link, reason=reason)
     send_email(subject, [referer.email], html_body)
 
+def create_paystack_recipient(name, account_number, bank_code):
+    """Generates a recipient code for the referrer's bank account."""
+    url = "https://api.paystack.co/transferrecipient"
+    headers = {
+        "Authorization": f"Bearer {os.environ.get('PAYSTACK_SECRET_KEY')}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "type": "nuban", "name": name,
+        "account_number": account_number, "bank_code": bank_code, "currency": "NGN"
+    }
+    try:
+        res = requests.post(url, headers=headers, json=payload).json()
+        if res.get("status"): return res["data"]["recipient_code"]
+    except Exception as e: print(f"Paystack Recipient Error: {e}")
+    return None
+
+def initiate_paystack_transfer(amount_naira, recipient_code, reason="Referral Payout"):
+    """Deducts from your Paystack balance and sends to the recipient."""
+    url = "https://api.paystack.co/transfer"
+    headers = {
+        "Authorization": f"Bearer {os.environ.get('PAYSTACK_SECRET_KEY')}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "source": "balance", 
+        "amount": int(float(amount_naira) * 100),
+        "recipient": recipient_code,
+        "reason": reason
+    }
+    try:
+        return requests.post(url, headers=headers, json=payload).json()
+    except Exception as e:
+        return {"status": False, "message": "API Connection Error"}
 @bp.route("/")
 def index():
     from app.models import Product, Catalog
@@ -720,49 +767,82 @@ def capture_ref():
     if ref:
         session["ref_token"] = ref
 
+@bp.route('/api/referer/fingerprint/setup/start', methods=['POST'])
+def referer_fingerprint_start():
+    data = request.get_json()
+    r = Referer.query.filter_by(token=data.get("token")).first_or_404()
+    options = generate_registration_options(
+        rp_id=RP_ID, rp_name=RP_NAME,
+        user_id=str(r.id).encode('utf-8'), user_name=r.name,
+    )
+    options_dict = json.loads(options_to_json(options))
+    session[f'webauthn_reg_{r.id}'] = options_dict['challenge']
 
-@bp.route("/referer/withdraw", methods=["POST"])
-def referer_withdraw():
-    data = request.get_json(force=True)
-    token = data.get("token")
-    
-    try:
-        amount = int(data.get("amount", 0))
-    except ValueError:
-        return jsonify({"status": False, "message": "Invalid amount"}), 400
-        
-    account = data.get("account")
+    return jsonify({"options": options_dict})
 
-    if not all([token, amount, account]):
-        return jsonify({"status": False, "message": "All fields are required"}), 400
 
-    if amount < 2000:
+@bp.route('/api/referer/withdraw/start', methods=['POST'])
+def referer_withdraw_start():
+    """Validates balance and challenges the phone for a fingerprint."""
+    data = request.get_json()
+    r = Referer.query.filter_by(token=data.get("token")).first_or_404()
+    amount = float(data.get("amount", 0))
+
+    if amount < 2000: 
         return jsonify({"status": False, "message": "Minimum withdrawal is ₦2,000"}), 400
-
-    r = Referer.query.filter_by(token=token, status="approved").first_or_404()
-
-    if amount > r.earnings:
+    if amount > r.earnings: 
         return jsonify({"status": False, "message": "Insufficient balance"}), 400
 
-    r.earnings -= amount
+    user_creds = BiometricCredential.query.filter_by(referer_id=r.id).all()
+    if not user_creds:
+        return jsonify({"status": False, "message": "No fingerprint setup. Please secure your account first."}), 403
 
-    w = Withdrawal(
-        referer_id=r.id,
-        amount=amount,
-        account_details=account,
-        status="pending"
-    )
-    db.session.add(w)
-    db.session.commit()
-    notify_referer(r, "withdrawal_request", amount=amount)
-    
-    send_email(
-        "Withdrawal Request - Heavenly Paint",
-        [current_app.config["MAIL_USERNAME"]],
-        f"<p>{r.name} requested a withdrawal of ₦{amount:,.2f}</p>"
-    )
+    allow_credentials = [PublicKeyCredentialDescriptor(id=c.credential_id) for c in user_creds]
+    options = generate_authentication_options(rp_id=RP_ID, allow_credentials=allow_credentials)
+    options_dict = json.loads(options_to_json(options))
+    session[f'webauthn_auth_{r.id}'] = options_dict['challenge']
+    session[f'pending_amount_{r.id}'] = amount
 
-    return jsonify({"status": True, "message": "Withdrawal submitted"})
+    return jsonify({"options": options_dict})
+@bp.route('/api/referer/withdraw/finish', methods=['POST'])
+def referer_withdraw_finish():
+    """Verifies fingerprint and triggers Paystack Instant Transfer."""
+    data = request.get_json()
+    r = Referer.query.filter_by(token=data.get("token")).first_or_404()
+    amount = session.get(f'pending_amount_{r.id}')
+
+    if not amount:
+        return jsonify({"status": False, "message": "Session expired. Try again."}), 400
+
+    try:
+        raw_id = data.get('credential', {}).get('id', '') + '=='
+        cred_id_bytes = base64.urlsafe_b64decode(raw_id)
+        saved_cred = BiometricCredential.query.filter_by(credential_id=cred_id_bytes).first()
+        verification = verify_authentication_response(
+            credential=data.get("credential"),
+            expected_challenge=session.get(f'webauthn_auth_{r.id}'),
+            expected_rp_id=RP_ID, expected_origin=EXPECTED_ORIGIN,
+            credential_public_key=saved_cred.public_key,
+            credential_current_sign_count=saved_cred.sign_count
+        )
+        saved_cred.sign_count = verification.new_sign_count
+        bank = Bank.query.get(r.bank_id)
+        if not bank or not bank.code:
+            raise ValueError("Bank code missing. Update your bank details.")
+        recipient_code = create_paystack_recipient(r.account_name, r.account_number, bank.code)
+        if not recipient_code: 
+            raise ValueError("Invalid bank details. Paystack rejected the account.")
+        transfer = initiate_paystack_transfer(amount, recipient_code)
+        if not transfer.get("status"):
+            raise ValueError(transfer.get("message", "Paystack transfer failed (Check Heavenly Paint balance)."))
+        r.earnings -= amount
+        w = Withdrawal(referer_id=r.id, amount=amount, account_details=r.account_number, status="paid")
+        db.session.add(w)
+        db.session.commit()
+        session.pop(f'pending_amount_{r.id}', None)
+        return jsonify({"status": True, "message": f"Verified! ₦{amount} sent instantly to your account."})
+    except Exception as e:
+        return jsonify({"status": False, "message": f"Verification or Payout Failed: {str(e)}"}), 400
 
 @bp.route("/referer/<token>/dashboard")
 def referer_dashboard(token):
@@ -863,6 +943,27 @@ def admin_delete_referer(id):
     flash(f"Referrer {referer.name} has been permanently deleted.", "success")
     return redirect(request.referrer or url_for('main.admin_doe'))
 
+@bp.route('/api/referer/fingerprint/setup/finish', methods=['POST'])
+def referer_fingerprint_finish():
+    data = request.get_json()
+    r = Referer.query.filter_by(token=data.get("token")).first_or_404()
+    try:
+        verification = verify_registration_response(
+            credential=data.get("credential"),
+            expected_challenge=session.get(f'webauthn_reg_{r.id}'),
+            expected_rp_id=RP_ID, expected_origin=EXPECTED_ORIGIN
+        )
+        new_cred = BiometricCredential(
+            referer_id=r.id,
+            credential_id=verification.credential_id,
+            public_key=verification.credential_public_key,
+            sign_count=verification.sign_count
+        )
+        db.session.add(new_cred)
+        db.session.commit()
+        return jsonify({"status": True, "message": "Fingerprint locked to your account!"})
+    except Exception as e:
+        return jsonify({"status": False, "message": str(e)}), 400
 
 @bp.route("/admin/verify-pickup", methods=["POST"])
 @login_required
@@ -894,7 +995,6 @@ def admin_verify_pickup():
             "collected_quantity": item.collected_quantity,
             "remaining_quantity": item.remaining_quantity
         })
-
     if order.is_fully_collected:
         order.delivered = True
         order.pickup_expired = True
@@ -907,7 +1007,6 @@ def admin_verify_pickup():
         items=items_data,
         delivered=order.delivered
     )
-
 
 @bp.route("/admin/collect-items", methods=["POST"])
 @login_required
@@ -1271,7 +1370,39 @@ def send_whatsapp_message(phone_number, message):
     except Exception as e:
         print("WhatsApp message failed:", e)
 
+@bp.route('/api/referer/withdraw/password', methods=['POST'])
+def referer_withdraw_password():
+    data = request.get_json()
+    r = Referer.query.filter_by(token=data.get("token")).first_or_404()
+    amount = float(data.get("amount", 0))
+    password_attempt = data.get("password", "").strip()
 
+    if amount < 2000: 
+        return jsonify({"status": False, "message": "Minimum withdrawal is ₦2,000"}), 400
+    if amount > r.earnings: 
+        return jsonify({"status": False, "message": "Insufficient balance"}), 400
+
+    expected_number = r.whatsapp.replace(" ", "").replace("+", "").strip()
+    provided_number = password_attempt.replace(" ", "").replace("+", "").strip()
+    if provided_number != expected_number:
+        return jsonify({"status": False, "message": "Verification failed. Incorrect account phone number."}), 403
+
+    try:
+        bank = Bank.query.get(r.bank_id)
+        recipient_code = create_paystack_recipient(r.account_name, r.account_number, bank.code)
+        if not recipient_code:
+            raise ValueError("Invalid bank details. Paystack rejected the account.")
+        transfer = initiate_paystack_transfer(amount, recipient_code)
+        if not transfer.get("status"):
+            raise ValueError(transfer.get("message", "Paystack transfer failed."))
+        r.earnings -= amount
+        w = Withdrawal(referer_id=r.id, amount=amount, account_details=r.account_number, status="paid")
+        db.session.add(w)
+        db.session.commit()
+        session.pop(f'pending_amount_{r.id}', None)
+        return jsonify({"status": True, "message": f"Verified via fallback! ₦{amount} sent instantly."})
+    except Exception as e:
+        return jsonify({"status": False, "message": f"Payout Failed: {str(e)}"}), 400
 
 @bp.route("/admin/withdrawals", endpoint="admin_withdrawals_view")
 @login_required
@@ -1337,7 +1468,7 @@ def edit_product(id):
 #    if current_user.username != 'admin':
 #        flash('Access denied.', 'danger')
 #        return redirect(url_for('main.index'))
-    
+
 #    product = Product.query.get_or_404(id)
 #    db.session.delete(product)
 #    db.session.commit()
@@ -1349,19 +1480,13 @@ def toggle_product(id):
     if current_user.username != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('main.index'))
-    
     from app.models import Product
     product = Product.query.get_or_404(id)
-    
-    # Flip the switch: Active becomes Inactive, and vice versa
     product.is_active = not product.is_active
     from app import db
     db.session.commit()
-    
     status = "restored to the public store" if product.is_active else "archived (hidden from the public store)"
     flash(f'Product "{product.name}" has been {status}.', 'success')
-    
-    # Redirect back to your secret admin dashboard route
     return redirect(url_for('main.admin_doe'))
 
 @bp.route('/verify_account', methods=['POST'])
@@ -2260,46 +2385,40 @@ def emergency_db_fix():
         return "Database stamped and upgraded successfully! You can now delete this route."
     except Exception as e:
         return f"Error: {str(e)}"
-# --- PUBLIC CATALOG ROUTE ---
+
 @bp.route('/catalog')
 def public_catalog():
-    # Fetch all catalog items, newest first
     from app.models import Catalog
     projects = Catalog.query.order_by(Catalog.created_at.desc()).all()
     return render_template('catalog.html', projects=projects)
 
-
-# --- ADMIN CATALOG MANAGEMENT ---
 @bp.route('/admin/catalog', methods=['GET', 'POST'])
 @login_required
 def admin_catalog():
     if current_user.username != 'admin':
         flash('Access denied.', 'danger')
         return redirect(url_for('main.index'))
-        
+
     from app.models import Catalog
-    
+
     if request.method == 'POST':
         title = request.form.get('title')
         description = request.form.get('description')
         image_file = request.files.get('image')
-        
+
         if not title or not image_file:
             flash("Title and Image are required.", "danger")
             return redirect(request.url)
-            
         try:
-            # Professional Cloudinary Upload: Auto-format and optimize for web
             upload_result = upload(
-                image_file, 
-                folder="heavenly_catalog", 
-                width=1080, 
-                height=1080, 
+                image_file,
+                folder="heavenly_catalog",
+                width=1080,
+                height=1080,
                 crop="limit",
                 fetch_format="auto",
                 quality="auto"
             )
-            
             new_project = Catalog(
                 title=title,
                 description=description,
@@ -2309,14 +2428,11 @@ def admin_catalog():
             )
             db.session.add(new_project)
             db.session.commit()
-            flash("Project added to catalog successfully!", "success")
-            
+            flash("Project successfully uploades!", "success")
         except Exception as e:
             db.session.rollback()
             flash(f"Error uploading image: {str(e)}", "danger")
-            
         return redirect(url_for('main.admin_catalog'))
-        
     projects = Catalog.query.order_by(Catalog.created_at.desc()).all()
     return render_template('admin/catalog.html', projects=projects)
 
@@ -2325,10 +2441,9 @@ def admin_catalog():
 def admin_delete_catalog(id):
     if current_user.username != 'admin':
         return redirect(url_for('main.index'))
-        
+
     from app.models import Catalog
     project = Catalog.query.get_or_404(id)
-    
     db.session.delete(project)
     db.session.commit()
     flash("Project removed from catalog.", "info")
