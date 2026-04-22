@@ -242,6 +242,46 @@ def initiate_paystack_transfer(amount_naira, recipient_code, reason="Referral Pa
         return requests.post(url, headers=headers, json=payload).json()
     except Exception as e:
         return {"status": False, "message": "API Connection Error"}
+
+import requests
+    import os
+
+    def fetch_paystack_bank_code(bank_name):
+        """Fetches the official bank code from Paystack based on a text name."""
+        url = "https://api.paystack.co/bank"
+        headers = {"Authorization": f"Bearer {os.environ.get('PAYSTACK_SECRET_KEY')}"}
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return None
+        banks = resp.json().get('data', [])
+        search_term = bank_name.lower().strip()
+        if search_term == "opay": search_term = "paycom"
+        if search_term == "gtb": search_term = "guaranty"
+        if search_term == "first bank": search_term = "first bank of nigeria"
+
+        for b in banks:
+            if search_term in b['name'].lower():
+                return b['code']
+        return None
+    ```
+    Now, scroll down to your `referer_withdraw_finish` function. Find the section where we grab the bank, and replace it with this auto-healing logic.
+
+    ```python
+        bank = Bank.query.get(r.bank_id)
+        if not bank:
+            raise ValueError("Bank details missing from account.")
+        bank_code = bank.code
+        if not bank_code:
+            bank_code = fetch_paystack_bank_code(bank.name)
+            if bank_code:
+                bank.code = bank_code
+                db.session.commit()
+            else:
+                raise ValueError(f"Paystack does not recognize the bank name: '{bank.name}'.")
+        recipient_code = create_paystack_recipient(r.account_name, r.account_number, bank_code)
+        if not recipient_code:
+            raise ValueError("Invalid bank details. Paystack rejected the account.") 
+           ```
 @bp.route("/")
 def index():
     from app.models import Product, Catalog
