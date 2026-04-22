@@ -17,6 +17,7 @@ from threading import Thread
 import os
 from PIL import Image
 from .models import OrderItem
+from .models import BiometricCredential
 from app.models import Bank
 import zipfile
 from io import BytesIO
