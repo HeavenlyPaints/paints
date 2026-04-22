@@ -994,8 +994,6 @@ def admin_approve_referer(id):
     flash(f"{referer.name} approved.", "success")
     return redirect(url_for("main.referer_requests"))
 
-
-
 @bp.route("/admin/referer/<int:id>/delete", methods=["POST"])
 @login_required
 def admin_delete_referer(id):
@@ -1004,9 +1002,11 @@ def admin_delete_referer(id):
         return redirect(url_for('main.index'))
 
     referer = Referer.query.get_or_404(id)
-    from app.models import Withdrawal
-    Withdrawal.query.filter_by(referer_id=referer.id).delete()
 
+    from app.models import Withdrawal, BiometricCredential
+
+    BiometricCredential.query.filter_by(referer_id=referer.id).delete()
+    Withdrawal.query.filter_by(referer_id=referer.id).delete()
     db.session.delete(referer)
     db.session.commit()
 
