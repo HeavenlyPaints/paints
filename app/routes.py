@@ -242,42 +242,30 @@ def initiate_paystack_transfer(amount_naira, recipient_code, reason="Referral Pa
         return requests.post(url, headers=headers, json=payload).json()
     except Exception as e:
         return {"status": False, "message": "API Connection Error"}
-
 def fetch_paystack_bank_code(bank_name):
-        """Fetches the official bank code from Paystack based on a text name."""
-        url = "https://api.paystack.co/bank"
-        headers = {"Authorization": f"Bearer {os.environ.get('PAYSTACK_SECRET_KEY')}"}
-        resp = requests.get(url, headers=headers)
+    """Fetches the official bank code from Paystack based on a text name."""
+    url = "https://api.paystack.co/bank"
+    headers = {"Authorization": f"Bearer {os.environ.get('PAYSTACK_SECRET_KEY')}"}
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
         if resp.status_code != 200:
             return None
+
         banks = resp.json().get('data', [])
         search_term = bank_name.lower().strip()
+
         if search_term == "opay": search_term = "paycom"
-        if search_term == "gtb": search_term = "guaranty"
-        if search_term == "first bank": search_term = "first bank of nigeria"
+        if "gtb" in search_term: search_term = "guaranty"
+        if "first bank" in search_term: search_term = "first bank of nigeria"
+
         for b in banks:
             if search_term in b['name'].lower():
                 return b['code']
+    except Exception:
         return None
-    ```
-    Now, scroll down to your `referer_withdraw_finish` function. Find the section where we grab the bank, and replace it with this auto-healing logic.
 
-    ```python
-        bank = Bank.query.get(r.bank_id)
-        if not bank:
-            raise ValueError("Bank details missing from account.")
-        bank_code = bank.code
-        if not bank_code:
-            bank_code = fetch_paystack_bank_code(bank.name)
-            if bank_code:
-                bank.code = bank_code
-                db.session.commit()
-            else:
-                raise ValueError(f"Paystack does not recognize the bank name: '{bank.name}'.")
-        recipient_code = create_paystack_recipient(r.account_name, r.account_number, bank_code)
-        if not recipient_code:
-            raise ValueError("Invalid bank details. Paystack rejected the account.")
-    ```
+    return None
 @bp.route("/")
 def index():
     from app.models import Product, Catalog
@@ -870,16 +858,17 @@ def referer_fingerprint_finish():
         return jsonify({"status": True, "message": "Fingerprint locked to your account!"})
     except Exception as e:
         return jsonify({"status": False, "message": str(e)}), 400
-
-
 @bp.route('/api/referer/withdraw/finish', methods=['POST'])
 def referer_withdraw_finish():
     data = request.get_json()
     r = Referer.query.filter_by(token=data.get("token")).first_or_404()
     amount = session.get(f'pending_amount_{r.id}')
+    
     saved_challenge_str = session.get(f'webauthn_auth_{r.id}')
+    
     if not amount or not saved_challenge_str: 
         return jsonify({"status": False, "message": "Session expired. Try again."}), 400
+
     padding = '=' * (4 - (len(saved_challenge_str) % 4))
     expected_challenge_bytes = base64.urlsafe_b64decode(saved_challenge_str + padding)
 
@@ -897,14 +886,23 @@ def referer_withdraw_finish():
         )
         saved_cred.sign_count = verification.new_sign_count
         bank = Bank.query.get(r.bank_id)
-        if not bank or not bank.code:
-            raise ValueError("Bank code missing. Update your bank details.")
-        recipient_code = create_paystack_recipient(r.account_name, r.account_number, bank.code)
+        if not bank:
+            return jsonify({"status": False, "message": "Bank details missing from account."}), 400
+        bank_code = bank.code
+        if not bank_code:
+            bank_code = fetch_paystack_bank_code(bank.name)
+            if bank_code:
+                bank.code = bank_code
+                db.session.commit()
+            else:
+                return jsonify({"status": False, "message": f"Paystack does not recognize '{bank.name}'. Update your bank details."}), 400
+        recipient_code = create_paystack_recipient(r.account_name, r.account_number, bank_code)
         if not recipient_code: 
-            raise ValueError("Invalid bank details. Paystack rejected the account.")
+            return jsonify({"status": False, "message": "Invalid bank details. Paystack rejected the account."}), 400
         transfer = initiate_paystack_transfer(amount, recipient_code)
         if not transfer.get("status"):
-            raise ValueError(transfer.get("message", "Paystack transfer failed (Check Heavenly Paint balance)."))
+            return jsonify({"status": False, "message": transfer.get("message", "Paystack transfer failed (Check Heavenly Paint Limited balance).")}), 400
+
         r.earnings -= amount
         w = Withdrawal(referer_id=r.id, amount=amount, account_details=r.account_number, status="paid")
         db.session.add(w)
@@ -913,6 +911,7 @@ def referer_withdraw_finish():
         return jsonify({"status": True, "message": f"Verified! ₦{amount} sent instantly to your account."})
     except Exception as e:
         return jsonify({"status": False, "message": f"Verification or Payout Failed: {str(e)}"}), 400
+
 @bp.route("/referer/<token>/dashboard")
 def referer_dashboard(token):
     referer = Referer.query.filter_by(token=token).first_or_404()
