@@ -243,10 +243,7 @@ def initiate_paystack_transfer(amount_naira, recipient_code, reason="Referral Pa
     except Exception as e:
         return {"status": False, "message": "API Connection Error"}
 
-import requests
-    import os
-
-    def fetch_paystack_bank_code(bank_name):
+def fetch_paystack_bank_code(bank_name):
         """Fetches the official bank code from Paystack based on a text name."""
         url = "https://api.paystack.co/bank"
         headers = {"Authorization": f"Bearer {os.environ.get('PAYSTACK_SECRET_KEY')}"}
@@ -258,7 +255,6 @@ import requests
         if search_term == "opay": search_term = "paycom"
         if search_term == "gtb": search_term = "guaranty"
         if search_term == "first bank": search_term = "first bank of nigeria"
-
         for b in banks:
             if search_term in b['name'].lower():
                 return b['code']
@@ -280,8 +276,8 @@ import requests
                 raise ValueError(f"Paystack does not recognize the bank name: '{bank.name}'.")
         recipient_code = create_paystack_recipient(r.account_name, r.account_number, bank_code)
         if not recipient_code:
-            raise ValueError("Invalid bank details. Paystack rejected the account.") 
-           ```
+            raise ValueError("Invalid bank details. Paystack rejected the account.")
+    ```
 @bp.route("/")
 def index():
     from app.models import Product, Catalog
