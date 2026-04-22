@@ -804,15 +804,47 @@ def referer_withdraw_start():
     session[f'pending_amount_{r.id}'] = amount
 
     return jsonify({"options": options_dict})
+
+@bp.route('/api/referer/fingerprint/setup/finish', methods=['POST'])
+def referer_fingerprint_finish():
+    data = request.get_json()
+    r = Referer.query.filter_by(token=data.get("token")).first_or_404()
+    saved_challenge_str = session.get(f'webauthn_reg_{r.id}')
+    if not saved_challenge_str:
+        return jsonify({"status": False, "message": "Session expired. Try again."}), 400
+    padding = '=' * (4 - (len(saved_challenge_str) % 4))
+    expected_challenge_bytes = base64.urlsafe_b64decode(saved_challenge_str + padding)
+
+    try:
+        verification = verify_registration_response(
+            credential=data.get("credential"),
+            expected_challenge=expected_challenge_bytes,
+            expected_rp_id=RP_ID,
+            expected_origin=EXPECTED_ORIGIN
+        )
+        new_cred = BiometricCredential(
+            referer_id=r.id,
+            credential_id=verification.credential_id,
+            public_key=verification.credential_public_key,
+            sign_count=verification.sign_count
+        )
+        db.session.add(new_cred)
+        db.session.commit()
+        return jsonify({"status": True, "message": "Fingerprint locked to your account!"})
+    except Exception as e:
+        return jsonify({"status": False, "message": str(e)}), 400
+
+
 @bp.route('/api/referer/withdraw/finish', methods=['POST'])
 def referer_withdraw_finish():
-    """Verifies fingerprint and triggers Paystack Instant Transfer."""
     data = request.get_json()
     r = Referer.query.filter_by(token=data.get("token")).first_or_404()
     amount = session.get(f'pending_amount_{r.id}')
-
-    if not amount:
+    saved_challenge_str = session.get(f'webauthn_auth_{r.id}')
+    if not amount or not saved_challenge_str: 
         return jsonify({"status": False, "message": "Session expired. Try again."}), 400
+    padding = '=' * (4 - (len(saved_challenge_str) % 4))
+    expected_challenge_bytes = base64.urlsafe_b64decode(saved_challenge_str + padding)
 
     try:
         raw_id = data.get('credential', {}).get('id', '') + '=='
@@ -820,8 +852,9 @@ def referer_withdraw_finish():
         saved_cred = BiometricCredential.query.filter_by(credential_id=cred_id_bytes).first()
         verification = verify_authentication_response(
             credential=data.get("credential"),
-            expected_challenge=session.get(f'webauthn_auth_{r.id}'),
-            expected_rp_id=RP_ID, expected_origin=EXPECTED_ORIGIN,
+            expected_challenge=expected_challenge_bytes,
+            expected_rp_id=RP_ID, 
+            expected_origin=EXPECTED_ORIGIN,
             credential_public_key=saved_cred.public_key,
             credential_current_sign_count=saved_cred.sign_count
         )
@@ -843,7 +876,6 @@ def referer_withdraw_finish():
         return jsonify({"status": True, "message": f"Verified! ₦{amount} sent instantly to your account."})
     except Exception as e:
         return jsonify({"status": False, "message": f"Verification or Payout Failed: {str(e)}"}), 400
-
 @bp.route("/referer/<token>/dashboard")
 def referer_dashboard(token):
     referer = Referer.query.filter_by(token=token).first_or_404()
@@ -942,28 +974,6 @@ def admin_delete_referer(id):
 
     flash(f"Referrer {referer.name} has been permanently deleted.", "success")
     return redirect(request.referrer or url_for('main.admin_doe'))
-
-@bp.route('/api/referer/fingerprint/setup/finish', methods=['POST'])
-def referer_fingerprint_finish():
-    data = request.get_json()
-    r = Referer.query.filter_by(token=data.get("token")).first_or_404()
-    try:
-        verification = verify_registration_response(
-            credential=data.get("credential"),
-            expected_challenge=session.get(f'webauthn_reg_{r.id}'),
-            expected_rp_id=RP_ID, expected_origin=EXPECTED_ORIGIN
-        )
-        new_cred = BiometricCredential(
-            referer_id=r.id,
-            credential_id=verification.credential_id,
-            public_key=verification.credential_public_key,
-            sign_count=verification.sign_count
-        )
-        db.session.add(new_cred)
-        db.session.commit()
-        return jsonify({"status": True, "message": "Fingerprint locked to your account!"})
-    except Exception as e:
-        return jsonify({"status": False, "message": str(e)}), 400
 
 @bp.route("/admin/verify-pickup", methods=["POST"])
 @login_required
