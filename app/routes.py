@@ -900,6 +900,7 @@ def referer_dashboard(token):
             Withdrawal.referer_id == referer.id,
             Withdrawal.created_at >= start_month
         ).scalar() or 0
+    has_biometric = BiometricCredential.query.filter_by(referer_id=referer.id).first() is not None
 
     return render_template(
         "referer/dashboard.html",
@@ -909,7 +910,8 @@ def referer_dashboard(token):
         monthly_earnings=referer.earnings,
         total_withdrawn=total_withdrawn,
         pending_withdraw=pending_withdraw,
-        monthly_withdrawn=monthly_withdrawn
+        monthly_withdrawn=monthly_withdrawn,
+        has_biometric=has_biometric
     )
 
 

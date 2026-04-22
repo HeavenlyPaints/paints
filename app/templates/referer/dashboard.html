@@ -13,13 +13,22 @@
 
 <hr>
 
+{% if has_biometric %}
+<div style="background-color: #d4edda; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c3e6cb; color: #155724;">
+    <h3 style="margin-top: 0; color: #155724;"><i class="fa-solid fa-shield-check"></i> Security Settings</h3>
+    <p style="font-size: 14px; margin-bottom: 0;">
+        <i class="fa-solid fa-circle-check"></i> <strong>Fingerprint Enabled.</strong> Your account is secured for instant withdrawals. You do not need to set this up again.
+    </p>
+</div>
+{% else %}
 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd;">
     <h3 style="margin-top: 0;"><i class="fa-solid fa-shield-halved"></i> Security Settings</h3>
     <p style="font-size: 14px; color: #555;">Lock your withdrawals to this device using your Fingerprint, FaceID, or Device PIN. <strong>You must do this before withdrawing.</strong></p>
-    <button class="btn" style="background-color: #333; color: white;" onclick="setupFingerprint('{{ referrer.token }}')">
+    <button class="btn" style="background-color: #333; color: white; width: 100%;" onclick="setupFingerprint('{{ referrer.token }}')">
         <i class="fa-solid fa-fingerprint"></i> Setup Device Security
     </button>
 </div>
+{% endif %}
 
 <hr>
 
