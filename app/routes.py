@@ -392,7 +392,6 @@ def cart_add():
     color_name = payload.get("color_name")
     color_hex = payload.get("color_hex")
     unit = payload.get("unit", "buckets").lower()
-    
     p = Product.query.get_or_404(pid)
     cart = _get_cart()
 
