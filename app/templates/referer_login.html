@@ -27,7 +27,7 @@
       {% endif %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('main.referer_login') }}">
+    <form id="login-form" method="POST" action="{{ url_for('main.referer_login') }}">
 
         <div class="form-group">
             <label for="whatsapp">WhatsApp Number</label>
@@ -40,12 +40,68 @@
             >
         </div>
 
-        <button type="submit" class="btn">Login</button>
+       <button id="login-btn" type="submit" class="btn">Login</button>
     </form>
     
     <p style="text-align: center; margin-top: 20px; font-size: 0.9em;">
         Don't have an account? <a href="{{ url_for('main.apply_referer') }}" style="font-weight: bold; text-decoration: none;">Apply Here</a>
     </p>
 </div>
+
+<script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+
+<script>
+    const { startAuthentication } = SimpleWebAuthnBrowser;
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault(); 
+        
+        const whatsapp = document.getElementById('whatsapp').value;
+        const btn = document.getElementById('login-btn');
+        const form = document.getElementById('login-form');
+        btn.innerText = "Checking Security...";
+        btn.disabled = true;
+
+        try {
+            const optionsResp = await fetch('/webauthn/login/options', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ whatsapp_number: whatsapp })
+            });
+
+            const options = await optionsResp.json();
+
+            if (options.error || options.fallback) {
+                form.submit();
+                return;
+            }
+
+            btn.innerText = "Waiting for Fingerprint...";
+            const assertionResponse = await startAuthentication(options);
+            const verificationResp = await fetch('/webauthn/login/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    whatsapp_number: whatsapp,
+                    assertion: assertionResponse
+                })
+            });
+
+            const verificationResult = await verificationResp.json();
+
+            if (verificationResult.verified) {
+                window.location.href = "/referer/" + verificationResult.token + "/dashboard"; 
+            } else {
+                alert("Biometric verification failed. Please try again.");
+                btn.innerText = "Login";
+                btn.disabled = false;
+            }
+
+        } catch (error) {
+            console.error("Biometric Error:", error);
+            form.submit(); 
+        }
+    });
+</script>
 
 {% endblock %}

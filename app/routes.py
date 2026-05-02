@@ -965,6 +965,74 @@ def referer_login():
         return redirect(url_for("main.referer_dashboard", token=referer.token))
     return render_template("referer_login.html")
 
+@bp.route('/webauthn/login/options', methods=['POST'])
+def webauthn_login_options():
+    data = request.get_json()
+    whatsapp = data.get('whatsapp_number', '').replace(" ", "").replace("+", "").strip()
+    referer = Referer.query.filter_by(whatsapp=whatsapp).first()
+    if not referer:
+        return jsonify({"error": "No account", "fallback": True})
+
+    if referer.status != "approved":
+        return jsonify({"error": "Not approved", "fallback": True})
+
+    user_creds = BiometricCredential.query.filter_by(referer_id=referer.id).all()
+    if not user_creds:
+        return jsonify({"fallback": True})
+
+    allow_credentials = [PublicKeyCredentialDescriptor(id=c.credential_id) for c in user_creds]
+    options = generate_authentication_options(
+        rp_id=RP_ID, 
+        allow_credentials=allow_credentials
+    )
+    options_dict = json.loads(options_to_json(options))
+    session[f'login_challenge_{referer.id}'] = options_dict['challenge']
+
+    return jsonify(options_dict)
+
+
+@bp.route('/webauthn/login/verify', methods=['POST'])
+def webauthn_login_verify():
+    data = request.get_json()
+    whatsapp = data.get('whatsapp_number', '').replace(" ", "").replace("+", "").strip()
+    assertion = data.get('assertion')
+
+    referer = Referer.query.filter_by(whatsapp=whatsapp).first()
+    if not referer:
+        return jsonify({"verified": False, "message": "Referrer not found"})
+
+    saved_challenge_str = session.get(f'login_challenge_{referer.id}')
+    if not saved_challenge_str:
+        return jsonify({"verified": False, "message": "Session expired"})
+
+    padding = '=' * (4 - (len(saved_challenge_str) % 4))
+    expected_challenge_bytes = base64.urlsafe_b64decode(saved_challenge_str + padding)
+
+    try:
+        raw_id = assertion.get('id', '') + '=='
+        cred_id_bytes = base64.urlsafe_b64decode(raw_id)
+        saved_cred = BiometricCredential.query.filter_by(credential_id=cred_id_bytes).first()
+
+        if not saved_cred:
+            return jsonify({"verified": False, "message": "Credential not found in database"})
+
+        verification = verify_authentication_response(
+            credential=assertion,
+            expected_challenge=expected_challenge_bytes,
+            expected_rp_id=RP_ID,
+            expected_origin=EXPECTED_ORIGIN,
+            credential_public_key=saved_cred.public_key,
+            credential_current_sign_count=saved_cred.sign_count
+        )
+
+        saved_cred.sign_count = verification.new_sign_count
+        db.session.commit()
+        session.pop(f'login_challenge_{referer.id}', None)
+
+        return jsonify({"verified": True, "token": referer.token})
+
+    except Exception as e:
+        return jsonify({"verified": False, "message": str(e)})
 
 @bp.route('/referer/pending/<token>')
 def referer_pending(token):
