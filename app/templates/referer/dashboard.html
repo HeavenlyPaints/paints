@@ -3,100 +3,216 @@
 {% block content %}
 <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
 
-<h2 style="display:flex; align-items:center; gap:10px;">
-    Welcome, {{ referrer.name }} 🎉
-    {% if badge %}
-        <img src="{{ url_for('static', filename='badges/' + badge|lower + '.png') }}" 
-             alt="{{ badge }}" style="height:90px ">
-    {% endif %}
-</h2>
+<style>
+    .toggle-btn {
+        background-color: #f8f9fa;
+        color: #333;
+        cursor: pointer;
+        padding: 15px 20px;
+        width: 100%;
+        border: 1px solid #ddd;
+        text-align: left;
+        outline: none;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 8px;
+        margin-top: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: background-color 0.3s ease;
+    }
+    .toggle-btn:hover {
+        background-color: #e2e6ea;
+    }
+    .toggle-content {
+        padding: 20px;
+        display: none;
+        background-color: white;
+        border: 1px solid #ddd;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        margin-top: -5px;
+    }
+    .settings-modal {
+        display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+        width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); 
+        backdrop-filter: blur(3px); align-items: center; justify-content: center;
+    }
+    .settings-modal-content {
+        background-color: #fff; padding: 25px; border-radius: 10px;
+        width: 90%; max-width: 500px; position: relative;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideDown 0.3s ease-out;
+    }
+    @keyframes slideDown { from {transform: translateY(-20px); opacity: 0;} to {transform: translateY(0); opacity: 1;} }
+    .close-modal-btn {
+        position: absolute; top: 15px; right: 20px; color: #aaa;
+        font-size: 28px; font-weight: bold; cursor: pointer; transition: 0.2s;
+    }
+    .close-modal-btn:hover { color: #333; }
+</style>
 
-<hr>
-
-{% if has_biometric %}
-<div style="background-color: #d4edda; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c3e6cb; color: #155724;">
-    <h3 style="margin-top: 0; color: #155724;"><i class="fa-solid fa-shield-check"></i> Security Settings</h3>
-    <p style="font-size: 14px; margin-bottom: 0;">
-        <i class="fa-solid fa-circle-check"></i> <strong>Fingerprint Enabled.</strong> Your account is secured for instant withdrawals. You do not need to set this up again.
-    </p>
-</div>
-{% else %}
-<div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #ddd;">
-    <h3 style="margin-top: 0;"><i class="fa-solid fa-shield-halved"></i> Security Settings</h3>
-    <p style="font-size: 14px; color: #555;">Lock your withdrawals to this device using your Fingerprint, FaceID, or Device PIN. <strong>You must do this before withdrawing.</strong></p>
-    <button class="btn" style="background-color: #333; color: white; width: 100%;" onclick="setupFingerprint('{{ referrer.token }}')">
-        <i class="fa-solid fa-fingerprint"></i> Setup Device Security
-    </button>
-</div>
-{% endif %}
-
-<hr>
-
-<h3>Bank Account Information</h3>
-<p><strong>Bank:</strong> {{ referrer.bank_name }}</p>
-<p><strong>Account Number:</strong> {{ referrer.account_number }}</p>
-<p><strong>Account Name:</strong> {{ referrer.account_name }}</p>
-
-<hr>
-
-<h3>Your Referral Stats</h3>
-<ul style="list-style:none; padding:0;">
-    <li>🧑‍🤝‍🧑 <strong>Total Referrals:</strong> {{ referrer.referrals_count }}</li>
-    <li>💰 <strong>Total Earnings:</strong> ₦{{ "{:,.2f}".format(referrer.earnings) }}</li>
-    <li>
-        🏅 <strong>Badge Level:</strong> 
+<div style="display:flex; justify-content: space-between; align-items:center; flex-wrap: wrap; margin-bottom: 25px; gap: 15px;">
+    <h2 style="display:flex; align-items:center; gap:10px; margin: 0;">
+        Welcome, {{ referrer.name }} 🎉
         {% if badge %}
-            <img src="{{ url_for('static', filename='badges/' + badge|lower + '.png') }}" 
-                 alt="{{ badge }}" style="height:30px; vertical-align:middle; margin-right:5px;">
-            {{ badge }}
-        {% else %}
-            None
+            <img src="{{ url_for('static', filename='badges/' + badge|lower + '.png') }}" alt="{{ badge }}" style="height:50px">
         {% endif %}
-    </li>
+    </h2>
+    <button class="btn" style="background-color: #e9ecef; color: #333; border: 1px solid #ccc; padding: 8px 15px;" onclick="openSettingsModal()">
+        <i class="fa-solid fa-gear"></i> Settings
+    </button>
+</div>
 
-    {% if next_badge %}
-    <li>
-        ⏩ <strong>Progress to next badge ({{ next_badge.name }}):</strong>
-        <div style="background:#eee; border-radius:8px; width:100%; max-width:400px; height:20px; margin-top:5px;">
-            <div style="background:#4caf50; height:100%; width:{{ next_badge_progress }}%; border-radius:8px;"></div>
-        </div>
-        <small>{{ referrer.referrals_count }}/{{ next_badge.threshold }} referrals</small>
-    </li>
+<div id="security-section-wrapper">
+    {% if has_biometric %}
+    <div style="background-color: #d4edda; padding: 20px; border-radius: 8px; border: 1px solid #c3e6cb; color: #155724; margin-bottom: 20px;">
+        <h3 style="margin-top: 0; color: #155724; font-size: 18px;"><i class="fa-solid fa-shield-check"></i> Security Settings</h3>
+        <p style="font-size: 14px; margin-bottom: 0;">
+            <i class="fa-solid fa-circle-check"></i> <strong>Fingerprint/FaceID Enabled.</strong> Your account is secured for instant withdrawals.
+        </p>
+    </div>
+    {% else %}
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px;">
+        <h3 style="margin-top: 0; font-size: 18px;"><i class="fa-solid fa-shield-halved"></i> Security Settings</h3>
+        <p style="font-size: 14px; color: #555;">Lock your withdrawals to this device using your Fingerprint, FaceID, or Device PIN. <strong>You must do this before withdrawing.</strong></p>
+        <button class="btn" style="background-color: #333; color: white; width: 100%;" onclick="setupFingerprint('{{ referrer.token }}', this)">
+            <i class="fa-solid fa-fingerprint"></i> Setup Device Security
+        </button>
+    </div>
     {% endif %}
+</div>
 
-    <li>📈 <strong>Commission Rate:</strong> {{ pct }}%</li>
-    <li>💵 <strong>Total Withdrawn:</strong> ₦{{ "{:,.2f}".format(total_withdrawn) }}</li>
-    <li>⏳ <strong>Pending Withdrawal:</strong> ₦{{ "{:,.2f}".format(pending_withdraw) }}</li>
-    <li>🗓 <strong>Withdrawn This Month:</strong> ₦{{ "{:,.2f}".format(monthly_withdrawn) }}</li>
-</ul>
+<div style="background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px;">
+    <h3 style="margin-top: 0; font-size: 18px;"><i class="fa-solid fa-building-columns"></i> Receiving Bank Account</h3>
+    <p style="margin-bottom: 5px; font-size: 15px;"><strong>Bank:</strong> {{ referrer.bank_name }}</p>
+    <p style="margin-bottom: 5px; font-size: 15px;"><strong>Account:</strong> {{ referrer.account_number }}</p>
+    <p style="margin-bottom: 0; font-size: 15px;"><strong>Name:</strong> {{ referrer.account_name }}</p>
+</div>
 
-<hr>
+<div style="background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+    <h3 style="margin-top: 0; font-size: 18px;"><i class="fa-solid fa-link"></i> Generate Referral Link</h3>
+    <p style="font-size: 14px; color: #555;">Share this link to earn commissions on purchases.</p>
+    <button class="btn btn-primary" onclick="generateReferral('{{ referrer.token }}')">Generate Link</button>
+    <p id="ref-link" style="margin-top:15px; word-break:break-all; font-weight: bold; color: #007bff; margin-bottom: 0;"></p>
+</div>
 
-<h3>Generate Referral Link</h3>
-<button class="btn" onclick="generateReferral('{{ referrer.token }}')">Generate Link</button>
-<p id="ref-link" style="margin-top:10px; word-break:break-all;"></p>
+<button class="toggle-btn" onclick="toggleSection('stats-section', this)">
+    <span><i class="fa-solid fa-chart-pie"></i> View Referral Stats & Earnings</span>
+    <span class="icon">▼</span>
+</button>
+<div id="stats-section" class="toggle-content">
+    <ul style="list-style:none; padding:0; margin: 0;">
+        <li style="margin-bottom: 8px;">🧑🤝🧑 <strong>Total Referrals:</strong> {{ referrer.referrals_count }}</li>
+        <li style="margin-bottom: 8px;">💰 <strong>Total Earnings:</strong> ₦{{ "{:,.2f}".format(referrer.earnings) }}</li>
+        <li style="margin-bottom: 8px;">📈 <strong>Commission Rate:</strong> {{ pct }}%</li>
+        
+        {% if next_badge %}
+        <li style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+            ⏩ <strong>Progress to {{ next_badge.name }}:</strong>
+            <div style="background:#ddd; border-radius:8px; width:100%; height:15px; margin-top:5px;">
+                <div style="background:#4caf50; height:100%; width:{{ next_badge_progress }}%; border-radius:8px;"></div>
+            </div>
+            <small style="color: #666;">{{ referrer.referrals_count }}/{{ next_badge.threshold }} referrals</small>
+        </li>
+        {% endif %}
+    </ul>
+</div>
 
-<hr>
-<h3>Withdraw Earnings</h3>
-<p style="font-size: 13px; color: #dc3545;">* Instant payouts require fingerprint verification or manual fallback.</p>
+<button class="toggle-btn" onclick="toggleSection('withdraw-section', this)">
+    <span><i class="fa-solid fa-wallet"></i> Withdraw Earnings</span>
+    <span class="icon">▼</span>
+</button>
+<div id="withdraw-section" class="toggle-content">
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+            <p style="font-size: 16px; margin-top:0;"><strong>Available:</strong> ₦{{ "{:,.2f}".format(referrer.earnings) }}</p>
+            <form id="withdraw-form" onsubmit="requestWithdraw(event, '{{ referrer.token }}')">
+                <input type="number" id="withdraw-amount" class="form-control" min="2000" required placeholder="Amount (Min ₦2,000)">
+                <button type="submit" class="btn" style="background-color: #28a745; color: white; width: 100%; margin-top: 10px;">
+                    <i class="fa-solid fa-bolt"></i> Instant Withdraw
+                </button>
+            </form>
 
-<form id="withdraw-form" onsubmit="requestWithdraw(event, '{{ referrer.token }}')">
-    <label>Withdrawal Amount (₦)</label>
-    <input type="number" id="withdraw-amount" min="2000" required placeholder="Min ₦2,000">
-    <button type="submit" class="btn" style="background-color: #28a745;">
-        <i class="fa-solid fa-bolt"></i> Instant Withdraw
-    </button>
-</form>
+            <div id="password-fallback" style="display: none; margin-top: 15px; padding: 15px; border: 1px solid #ffc107; background-color: #fff8e5; border-radius: 8px;">
+                <p style="color: #856404; font-size: 13px; margin-top: 0;"><strong>Biometrics failed.</strong> Enter your WhatsApp number to verify.</p>
+                <input type="text" id="fallback-password" class="form-control" placeholder="e.g. 2348012345678">
+                <button onclick="requestPasswordWithdraw('{{ referrer.token }}')" class="btn" style="background-color: #ffc107; color: #000; margin-top: 10px; width: 100%;">
+                    Verify & Withdraw
+                </button>
+            </div>
+        </div>
 
-<div id="password-fallback" style="display: none; margin-top: 15px; padding: 15px; border: 1px solid #ffc107; background-color: #fff8e5; border-radius: 8px;">
-    <p style="color: #856404; font-size: 14px; margin-top: 0;"><strong>Biometrics not supported or canceled.</strong> Please enter your registered WhatsApp number to authorize this withdrawal.</p>
-    <input type="text" id="fallback-password" class="form-control" placeholder="e.g. 08012345678">
-    <button onclick="requestPasswordWithdraw('{{ referrer.token }}')" class="btn" style="background-color: #ffc107; color: #000; margin-top: 10px; width: 100%;">
-        Verify & Withdraw
-    </button>
+        <div style="flex: 1; min-width: 250px; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+            <p style="margin-top: 0; margin-bottom: 5px; font-size: 14px;">💵 <strong>Total Withdrawn:</strong><br> ₦{{ "{:,.2f}".format(total_withdrawn) }}</p>
+            <p style="margin-bottom: 5px; font-size: 14px;">⏳ <strong>Pending:</strong><br> ₦{{ "{:,.2f}".format(pending_withdraw) }}</p>
+            <p style="margin-bottom: 0; font-size: 14px;">🗓 <strong>This Month:</strong><br> ₦{{ "{:,.2f}".format(monthly_withdrawn) }}</p>
+        </div>
+    </div>
+</div>
+
+<div id="accountSettingsModal" class="settings-modal">
+    <div class="settings-modal-content">
+        <span class="close-modal-btn" onclick="closeSettingsModal()">&times;</span>
+        <h3 style="margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px;">Account Settings</h3>
+        
+        <form method="POST" action="/referer/update-settings">
+            <input type="hidden" name="token" value="{{ referrer.token }}">
+            
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Full Name (Fixed)</label>
+                <input type="text" value="{{ referrer.name }}" class="form-control" disabled>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Email Address</label>
+                <input type="email" name="email" value="{{ referrer.email }}" class="form-control">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>WhatsApp Number</label>
+                <input type="text" name="whatsapp" value="{{ referrer.whatsapp }}" class="form-control" required>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Bank Name</label>
+                <input type="text" name="bank_name" value="{{ referrer.bank_name }}" class="form-control" placeholder="e.g. Opay" required>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Account Number</label>
+                <input type="text" name="account_number" value="{{ referrer.account_number }}" class="form-control" required>
+                <small style="color: #dc3545; display: block; margin-top: 5px;">Bank account name must match your registered name: <b>{{ referrer.name }}</b></small>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Save Changes</button>
+        </form>
+    </div>
 </div>
 
 <script>
+function toggleSection(sectionId, btnElement) {
+    var content = document.getElementById(sectionId);
+    var icon = btnElement.querySelector('.icon');
+    
+    if (content.style.display === "block") {
+        content.style.display = "none";
+        icon.innerText = "▼";
+        btnElement.style.borderBottomLeftRadius = "8px";
+        btnElement.style.borderBottomRightRadius = "8px";
+    } else {
+        content.style.display = "block";
+        icon.innerText = "▲";
+        btnElement.style.borderBottomLeftRadius = "0";
+        btnElement.style.borderBottomRightRadius = "0";
+    }
+}
+
+const modal = document.getElementById("accountSettingsModal");
+function openSettingsModal() { modal.style.display = "flex"; }
+function closeSettingsModal() { modal.style.display = "none"; }
+window.onclick = function(event) { if (event.target == modal) { modal.style.display = "none"; } }
+
 function generateReferral(token) {
     fetch('/generate_link/' + token)
         .then(r => r.json())
@@ -129,9 +245,9 @@ async function setupFingerprint(token) {
         
         const verifyJson = await verifyResp.json();
         alert(verifyJson.message);
+        if(verifyJson.status) location.reload();
         
     } catch (error) {
-        console.error(error);
         alert("Setup canceled or your device does not support biometrics/PIN lock.");
     }
 }
@@ -170,7 +286,6 @@ async function requestWithdraw(e, token) {
         }
         
     } catch (error) {
-        console.warn("Fingerprint canceled or unsupported. Triggering fallback.", error);
         document.getElementById('password-fallback').style.display = 'block';
     }
 }
@@ -202,7 +317,6 @@ async function requestPasswordWithdraw(token) {
             btn.innerText = "Verify & Withdraw";
         }
     } catch (error) {
-        console.error(error);
         alert("Network error. Please try again.");
         btn.disabled = false;
         btn.innerText = "Verify & Withdraw";

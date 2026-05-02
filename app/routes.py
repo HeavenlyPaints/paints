@@ -965,6 +965,45 @@ def referer_login():
         return redirect(url_for("main.referer_dashboard", token=referer.token))
     return render_template("referer_login.html")
 
+@bp.route('/referer/update-settings', methods=['POST'])
+def referer_update_settings():
+    token = request.form.get('token')
+    referer = Referer.query.filter_by(token=token).first_or_404()
+
+    new_email = request.form.get('email')
+    new_whatsapp = request.form.get('whatsapp').replace(" ", "").replace("+", "").strip()
+    new_account_number = request.form.get('account_number').strip()
+    new_bank_name = request.form.get('bank_name').strip()
+
+    if new_whatsapp != referer.whatsapp:
+        existing_user = Referer.query.filter_by(whatsapp=new_whatsapp).first()
+        if existing_user:
+            flash("That WhatsApp number is already registered.", "danger")
+            return redirect(url_for('main.referer_dashboard', token=referer.token))
+        
+        from app.models import BiometricCredential
+        BiometricCredential.query.filter_by(referer_id=referer.id).delete()
+        flash("WhatsApp updated. Please re-register your fingerprint.", "warning")
+
+    referer.email = new_email
+    referer.whatsapp = new_whatsapp
+    
+    if new_account_number != referer.account_number or new_bank_name != referer.bank_name:
+        referer.account_number = new_account_number
+        referer.bank_name = new_bank_name
+        
+        from app.models import Bank
+        bank = Bank.query.filter_by(name=new_bank_name).first()
+        if bank:
+            referer.bank_id = bank.id
+            
+        referer.account_name = referer.name 
+        
+    db.session.commit()
+    
+    flash("Settings updated successfully!", "success")
+    return redirect(url_for('main.referer_dashboard', token=referer.token))
+
 @bp.route('/webauthn/login/options', methods=['POST'])
 def webauthn_login_options():
     data = request.get_json()
