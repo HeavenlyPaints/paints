@@ -42,6 +42,7 @@
     }
     .badge-active { background-color: #d4edda; color: #155724; }
     .badge-inactive { background-color: #f8d7da; color: #721c24; }
+    .badge-expired { background-color: #e2e3e5; color: #383d41; }
 
     .custom-table { width: 100%; border-collapse: collapse; }
     .custom-table th, .custom-table td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
@@ -74,6 +75,11 @@
                 <label>Discount Percentage (%)</label>
                 <input type="number" name="discount_pct" step="0.1" min="0.1" max="100" placeholder="e.g. 15 for 15% off" required>
             </div>
+
+            <div class="form-group">
+                <label>Expiration Date & Time (Optional)</label>
+                <input type="datetime-local" name="expires_at">
+            </div>
             
             <button type="submit" class="btn" style="background-color: #28a745; color: white; width: 100%; padding: 12px; font-size: 1.05em; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                 Generate Coupon
@@ -90,6 +96,7 @@
                     <tr>
                         <th>Code</th>
                         <th>Discount</th>
+                        <th>Expires At</th>
                         <th>Status</th>
                         <th style="text-align: right;">Actions</th>
                     </tr>
@@ -99,8 +106,17 @@
                     <tr>
                         <td style="font-weight: bold; color: #007bff; letter-spacing: 1px; font-size: 1.1em;">{{ c.code }}</td>
                         <td style="font-weight: bold;">{{ c.discount_pct }}% OFF</td>
+                        <td style="font-size: 0.9em; color: #555;">
+                            {% if c.expires_at %}
+                                {{ c.expires_at.strftime('%Y-%m-%d %H:%M') }}
+                            {% else %}
+                                Never
+                            {% endif %}
+                        </td>
                         <td>
-                            {% if c.is_active %}
+                            {% if c.expires_at and c.expires_at < now %}
+                                <span class="status-badge badge-expired">Expired</span>
+                            {% elif c.is_active %}
                                 <span class="status-badge badge-active">Active</span>
                             {% else %}
                                 <span class="status-badge badge-inactive">Inactive</span>
@@ -123,7 +139,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" style="padding: 30px; text-align: center; color: #6c757d;">
+                        <td colspan="5" style="padding: 30px; text-align: center; color: #6c757d;">
                             <i class="fa-solid fa-ticket" style="font-size: 2em; color: #dee2e6; margin-bottom: 10px; display: block;"></i>
                             No coupons generated yet. Create one on the left.
                         </td>

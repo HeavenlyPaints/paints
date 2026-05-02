@@ -65,6 +65,84 @@
     {% block content %}{% endblock %}
   </main>
 
+   <style>
+    .feedback-bubble-btn {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        width: 60px;
+        height: 60px;
+        background-color: #000;
+        color: #fff;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 9998;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s;
+    }
+    .feedback-bubble-btn:hover {
+        transform: scale(1.05);
+    }
+    .feedback-modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: rgba(0,0,0,0.6);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(3px);
+    }
+    .feedback-modal-box {
+        width: 90%;
+        max-width: 600px;
+        background: #f8f9fa;
+        padding: 30px;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+        position: relative;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+    .feedback-close-btn {
+        position: absolute;
+        top: 15px;
+        right: 20px;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        color: #aaa;
+    }
+    .feedback-close-btn:hover {
+        color: #000;
+    }
+</style>
+
+<button class="feedback-bubble-btn" onclick="document.getElementById('feedbackModal').style.display='flex'">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+    </svg>
+</button>
+
+<div id="feedbackModal" class="feedback-modal-overlay" onclick="if(event.target === this) this.style.display='none'">
+    <div class="feedback-modal-box">
+        <span class="feedback-close-btn" onclick="document.getElementById('feedbackModal').style.display='none'">&times;</span>
+        <h3 style="text-align: center; margin-top: 0;">Leave a Suggestion</h3>
+        <p style="text-align: center; color: #666;">What should we add or change to make Heavenly Paint better?</p>
+        <form method="POST" action="/submit-feedback">
+            <div style="margin-bottom: 15px;">
+                <input type="text" name="name" class="form-control" placeholder="Your Name (Optional)" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <textarea name="message" class="form-control" rows="4" placeholder="I think the site should have..." required style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; resize: vertical; font-family: inherit;"></textarea>
+            </div>
+            <button type="submit" class="btn" style="width: 100%; background-color: #000; color: #fff; padding: 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">Submit Feedback</button>
+        </form>
+    </div>
+</div>
   <footer class="site-footer">
     <nav class="footer-links">
       <a href="mailto:heavenlypaints33@gmail.com">Email</a>

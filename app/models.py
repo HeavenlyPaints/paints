@@ -189,7 +189,7 @@ class Coupon(db.Model):
     discount_pct = db.Column(db.Float, nullable=False) 
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
+    expires_at = db.Column(db.DateTime, nullable=True)
 
 class SiteSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -229,3 +229,9 @@ class BiometricCredential(db.Model):
     credential_id = db.Column(db.LargeBinary, unique=True, nullable=False)
     public_key = db.Column(db.LargeBinary, nullable=False)
     sign_count = db.Column(db.Integer, default=0)
+
+class SiteFeedback(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), default="Anonymous")
+    message = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

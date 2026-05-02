@@ -75,6 +75,9 @@
                                             <button type="submit" class="btn btn-sm btn-danger">
                                                 <i class="fa-solid fa-trash"></i> Delete
                                             </button>
+                                            <a href="{{ url_for('main.admin_edit_catalog', id=project.id) }}" class="btn btn-primary btn-sm" style="border-radius: 6px; padding: 6px 12px; font-weight: bold;">
+    <i class="fa-solid fa-pen"></i> Edit
+</a>
                                         </form>
                                     </td>
                                 </tr>

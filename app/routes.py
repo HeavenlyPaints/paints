@@ -18,6 +18,7 @@ import os
 from PIL import Image
 from .models import OrderItem
 from .models import BiometricCredential
+from .models import SiteFeedback
 from app.models import Bank
 import zipfile
 from io import BytesIO
@@ -426,6 +427,15 @@ def apply_coupon():
         return jsonify({
             "status": False, 
             "message": "Invalid or inactive coupon code."
+        })
+
+    if coupon.expires_at and datetime.utcnow() > coupon.expires_at:
+        coupon.is_active = False
+        db.session.commit()
+        session.pop('applied_coupon', None)
+        return jsonify({
+            "status": False,
+            "message": "This coupon code has expired."
         })
 
     session['applied_coupon'] = {
@@ -1753,7 +1763,44 @@ def admin_delete_order(order_id):
     flash("Order permanently deleted from the database.", "success")
     return redirect(url_for("main.admin_orders"))
 
+@bp.route('/submit-feedback', methods=['POST'])
+def submit_feedback():
+    name = request.form.get('name', 'Anonymous').strip()
+    message = request.form.get('message', '').strip()
 
+    if not name:
+        name = "Anonymous"
+
+    if message:
+        new_feedback = SiteFeedback(name=name, message=message)
+        db.session.add(new_feedback)
+        db.session.commit()
+        flash("Thank you for your feedback!", "success")
+    else:
+        flash("Feedback message cannot be empty.", "danger")
+
+    return redirect(url_for('main.index'))
+
+@bp.route("/admin/feedback")
+@login_required
+def admin_feedback():
+    if current_user.username != 'admin':
+        return redirect(url_for('main.index'))
+    
+    feedbacks = SiteFeedback.query.order_by(SiteFeedback.created_at.desc()).all()
+    return render_template("admin/feedback.html", feedbacks=feedbacks)
+
+@bp.route("/admin/feedback/delete/<int:id>", methods=["POST"])
+@login_required
+def admin_delete_feedback(id):
+    if current_user.username != 'admin':
+        return redirect(url_for('main.index'))
+    
+    fb = SiteFeedback.query.get_or_404(id)
+    db.session.delete(fb)
+    db.session.commit()
+    flash("Feedback deleted successfully.", "success")
+    return redirect(url_for('main.admin_feedback'))
 
 
 @bp.route("/payment_confirmation/<reference>")
@@ -2342,6 +2389,7 @@ def admin_coupons():
     
     if request.method == 'POST':
         code = request.form.get('code', '').upper().strip()
+        expires_str = request.form.get('expires_at')
         try:
             discount = float(request.form.get('discount_pct', 0))
         except ValueError:
@@ -2350,6 +2398,13 @@ def admin_coupons():
         if not code or discount <= 0:
             flash("Please enter a valid code and a discount greater than 0.", "error")
             return redirect(url_for('main.admin_coupons'))
+  
+        expires_at = None
+        if expires_str:
+            try:
+                expires_at = datetime.strptime(expires_str, '%Y-%m-%dT%H:%M')
+            except ValueError:
+                pass
 
         if Coupon.query.filter_by(code=code).first():
             flash("That coupon code already exists!", "error")
@@ -2602,3 +2657,45 @@ def admin_delete_catalog(id):
     db.session.commit()
     flash("Project removed from catalog.", "info")
     return redirect(url_for('main.admin_catalog'))
+
+@bp.route('/admin/catalog/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_catalog(id):
+    if current_user.username != 'admin':
+        return redirect(url_for('main.index'))
+
+    from app.models import Catalog
+    project = Catalog.query.get_or_404(id)
+
+    if request.method == 'POST':
+        title = request.form.get('title')
+        description = request.form.get('description')
+        image_file = request.files.get('image')
+
+        if title:
+            project.title = title
+        if description:
+            project.description = description
+
+        if image_file and image_file.filename != '':
+            try:
+                upload_result = upload(
+                    image_file,
+                    folder="heavenly_catalog",
+                    width=1080,
+                    height=1080,
+                    crop="limit",
+                    fetch_format="auto",
+                    quality="auto"
+                )
+                project.image = upload_result['secure_url']
+                project.image_url = upload_result['secure_url']
+            except Exception as e:
+                flash(f"Error uploading new image: {str(e)}", "danger")
+                return redirect(request.url)
+
+        db.session.commit()
+        flash("Catalog project updated successfully!", "success")
+        return redirect(url_for('main.admin_catalog'))
+
+    return render_template('admin/edit_catalog.html', project=project)
