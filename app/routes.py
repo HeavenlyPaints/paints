@@ -14,6 +14,7 @@ from flask import send_file, abort, current_app
 import io
 from twilio.rest import Client
 from threading import Thread
+from sqlalchemy import text
 import os
 from PIL import Image
 from .models import OrderItem
@@ -74,6 +75,20 @@ bp = Blueprint('main', __name__)
 @login_manager.user_loader
 def load_user(user_id):
     return Admin.query.get(int(user_id))
+
+from flask_migrate import upgrade
+
+db_upgraded = False
+
+@bp.before_app_request
+def auto_upgrade_database():
+    global db_upgraded
+    if not db_upgraded:
+        try:
+            upgrade()
+        except Exception:
+            pass
+        db_upgraded = True
 
 @bp.context_processor
 def inject_site_settings():
