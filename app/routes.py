@@ -2404,10 +2404,20 @@ def admin_coupons():
     if current_user.username != 'admin':
         flash("Access denied.", "danger")
         return redirect(url_for('main.index'))
+        
+    from datetime import datetime
+    
+    try:
+        from sqlalchemy import text
+        db.session.execute(text("ALTER TABLE coupon ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
     
     if request.method == 'POST':
         code = request.form.get('code', '').upper().strip()
         expires_str = request.form.get('expires_at')
+        
         try:
             discount = float(request.form.get('discount_pct', 0))
         except ValueError:
@@ -2416,26 +2426,32 @@ def admin_coupons():
         if not code or discount <= 0:
             flash("Please enter a valid code and a discount greater than 0.", "error")
             return redirect(url_for('main.admin_coupons'))
-  
+
         expires_at = None
         if expires_str:
             try:
-                expires_at = datetime.strptime(expires_str, '%Y-%m-%dT%H:%M')
-            except ValueError:
+
+                if len(expires_str) > 16:
+                    expires_at = datetime.strptime(expires_str, '%Y-%m-%dT%H:%M:%S')
+                else:
+                    expires_at = datetime.strptime(expires_str, '%Y-%m-%dT%H:%M')
+            except ValueError as e:
+                print(f"Date parsing failed: {e}")
                 pass
 
         if Coupon.query.filter_by(code=code).first():
             flash("That coupon code already exists!", "error")
         else:
-            new_coupon = Coupon(code=code, discount_pct=discount)
+            new_coupon = Coupon(code=code, discount_pct=discount, expires_at=expires_at)
             db.session.add(new_coupon)
             db.session.commit()
-            flash(f"Coupon {code} created successfully for {discount}% off!", "success")
+            flash(f"Coupon {code} created successfully!", "success")
             
         return redirect(url_for('main.admin_coupons'))
         
     coupons = Coupon.query.order_by(Coupon.created_at.desc()).all()
-    return render_template('admin/coupons.html', coupons=coupons)
+    
+    return render_template('admin/coupons.html', coupons=coupons, now=datetime.utcnow())
 
 
 @bp.route('/admin/coupons/toggle/<int:id>', methods=['POST'])
