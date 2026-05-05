@@ -795,11 +795,29 @@ def generate_link(token):
 
 
 
+#@bp.before_app_request
+#def capture_ref():
+#    ref = request.args.get("ref")
+#    if ref:
+#        session["ref_token"] = ref
+
+db_fixed = False
+
 @bp.before_app_request
-def capture_ref():
+def run_before_requests():
     ref = request.args.get("ref")
     if ref:
         session["ref_token"] = ref
+
+    global db_fixed
+    if not db_fixed:
+        try:
+            from sqlalchemy import text
+            db.session.execute(text("ALTER TABLE coupon ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        db_fixed = True
 
 @bp.route('/api/referer/fingerprint/setup/start', methods=['POST'])
 def referer_fingerprint_start():
