@@ -12,7 +12,6 @@ from flask_login import logout_user, login_required
 from sqlalchemy.exc import IntegrityError
 from flask import send_file, abort, current_app
 import io
-from twilio.rest import Client
 from threading import Thread
 import os
 from PIL import Image
@@ -121,61 +120,6 @@ def send_task_email(user_email, user_name, task_title, task_desc, task_link):
     msg = EmailMessage(subject, html_content, to=[user_email])
     msg.content_subtype = "html"
     Thread(target=send_async_email, args=(current_app._get_current_object(), msg)).start()
-
-
-def send_async_twilio(client, from_number, to_number, body):
-    try:
-        client.messages.create(
-            from_=f"whatsapp:{from_number}",
-            body=body,
-            to=f"whatsapp:{to_number}"
-        )
-    except Exception as e:
-        print(f"Twilio WhatsApp Error: {e}")
-
-def send_async_twilio(client, from_number, to_number, body):
-    try:
-        client.messages.create(
-            from_=f"whatsapp:{from_number}",
-            body=body,
-            to=f"whatsapp:{to_number}"
-        )
-    except Exception as e:
-        print(f"Twilio WhatsApp Error: {e}")
-
-def send_whatsapp_welcome(phone_number, name):
-    account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
-    auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
-    from_number = os.environ.get('TWILIO_WHATSAPP_NUMBER')
-    
-    if not all([account_sid, auth_token, from_number]):
-        print("Credentials retrieval error!")
-        return
-
-    client = Client(account_sid, auth_token)
-
-    clean_phone = phone_number.replace(" ", "")
-    if clean_phone.startswith("0"):
-        clean_phone = "+234" + clean_phone[1:]
-    elif not clean_phone.startswith("+"):
-        clean_phone = "+" + clean_phone
-
-    body = f"Hello {name}! 🎉\n\nWelcome to the Heavenly Paint Limited Referral Program. We are thrilled to have you.\n\nColor your world with Shree."
-    Thread(target=send_async_twilio, args=(client, from_number, clean_phone, body)).start()
-
-def send_whatsapp_admin_alert(referer_name, referer_phone):
-    account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
-    auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
-    from_number = os.environ.get('TWILIO_WHATSAPP_NUMBER')
-    admin_number = os.environ.get('ADMIN_WHATSAPP_NUMBER') 
-
-    if not all([account_sid, auth_token, from_number, admin_number]):
-        print("Missing Twilio credentials or Admin Number.")
-        return
-
-    client = Client(account_sid, auth_token)
-    body = f"🚨 *New Referrer Application*\n\nName: {referer_name}\nPhone: {referer_phone}\n\nLog in to the Heavenly Paint dashboard to approve them."
-    Thread(target=send_async_twilio, args=(client, from_number, admin_number, body)).start()
 
 def notify_referer(referer, action, reason=None, amount=None):
     """
@@ -776,8 +720,6 @@ def apply_referer():
         db.session.commit()
 
         notify_referer(r, "pending")
-        send_whatsapp_welcome(r.whatsapp, r.name)
-        send_whatsapp_admin_alert(r.name, r.whatsapp)
         send_email(
             "New Referer Application",
             [current_app.config["MAIL_USERNAME"]],
