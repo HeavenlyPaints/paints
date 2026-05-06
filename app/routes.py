@@ -416,6 +416,7 @@ def cart_add():
     _save_cart(cart)
     return jsonify({"status": True, "cart": cart})
 
+
 @bp.route('/cart/apply-coupon', methods=['POST'])
 def apply_coupon():
     payload = request.get_json(force=True)
@@ -429,7 +430,10 @@ def apply_coupon():
             "message": "Invalid or inactive coupon code."
         })
 
-    if coupon.expires_at and datetime.utcnow() > coupon.expires_at:
+    from datetime import datetime, timedelta
+    now_local = datetime.utcnow() + timedelta(hours=1)
+
+    if coupon.expires_at and now_local > coupon.expires_at:
         coupon.is_active = False
         db.session.commit()
         session.pop('applied_coupon', None)
@@ -449,7 +453,6 @@ def apply_coupon():
         "message": f"Success! {coupon.discount_pct}% discount applied.",
         "discount_pct": coupon.discount_pct
     })
-
 
 @bp.route("/cart/remove", methods=["POST"])
 def cart_remove():
@@ -2397,7 +2400,6 @@ def signup():
     banks = Bank.query.order_by(Bank.name).all()
     return render_template('signup.html', banks=banks)
 
-
 @bp.route('/admin/coupons', methods=['GET', 'POST'])
 @login_required
 def admin_coupons():
@@ -2405,15 +2407,27 @@ def admin_coupons():
         flash("Access denied.", "danger")
         return redirect(url_for('main.index'))
         
-    from datetime import datetime
+    from datetime import datetime, timedelta
     
+    now_local = datetime.utcnow() + timedelta(hours=1)
     try:
         from sqlalchemy import text
         db.session.execute(text("ALTER TABLE coupon ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;"))
         db.session.commit()
     except Exception:
         db.session.rollback()
+
+    expired_coupons = Coupon.query.filter(
+        Coupon.expires_at != None,
+        Coupon.expires_at <= now_local,
+        Coupon.is_active == True
+    ).all()
     
+    if expired_coupons:
+        for ec in expired_coupons:
+            ec.is_active = False
+        db.session.commit()
+
     if request.method == 'POST':
         code = request.form.get('code', '').upper().strip()
         expires_str = request.form.get('expires_at')
@@ -2430,13 +2444,11 @@ def admin_coupons():
         expires_at = None
         if expires_str:
             try:
-
                 if len(expires_str) > 16:
                     expires_at = datetime.strptime(expires_str, '%Y-%m-%dT%H:%M:%S')
                 else:
                     expires_at = datetime.strptime(expires_str, '%Y-%m-%dT%H:%M')
-            except ValueError as e:
-                print(f"Date parsing failed: {e}")
+            except ValueError:
                 pass
 
         if Coupon.query.filter_by(code=code).first():
@@ -2450,9 +2462,8 @@ def admin_coupons():
         return redirect(url_for('main.admin_coupons'))
         
     coupons = Coupon.query.order_by(Coupon.created_at.desc()).all()
-    
-    return render_template('admin/coupons.html', coupons=coupons, now=datetime.utcnow())
 
+    return render_template('admin/coupons.html', coupons=coupons, now=now_local)
 
 @bp.route('/admin/coupons/toggle/<int:id>', methods=['POST'])
 @login_required
