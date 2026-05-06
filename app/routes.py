@@ -84,7 +84,11 @@ from flask_mailman import EmailMessage
 
 def send_async_email(app, msg):
     with app.app_context():
-        msg.send()
+        try:
+            msg.send()
+            print(f"SUCCESS: Email sent successfully to {msg.to}!")
+        except Exception as e:
+            print(f"CRITICAL EMAIL ERROR: {str(e)}")
 
 from flask import render_template
 
