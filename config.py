@@ -12,6 +12,14 @@ class Config:
     SQLALCHEMY_DATABASE_URI = database_url or f"sqlite:///{os.path.join(basedir,'ecom.db')}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    if database_url and database_url.startswith("postgresql"):
+        SQLALCHEMY_ENGINE_OPTIONS = {
+            "pool_size": 10,
+            "pool_recycle": 1800,
+            "pool_pre_ping": True,
+            "max_overflow": 20
+        }
+
     UPLOAD_FOLDER = os.environ.get(
         "UPLOAD_FOLDER",
         os.path.join(os.getcwd(),"app","static","uploads")
