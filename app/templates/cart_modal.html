@@ -42,20 +42,26 @@
 "></div>
 
 <div id="color-modal" class="modal" style="display:none;">
-  <div class="modal-content">
-    <span class="close-btn" onclick="closeColorModal()" style="cursor:pointer; float: right; font-size: 20px;">×</span>
-    <h3>Select Color for Product</h3>
-    <p id="color-product-name" style="font-weight:bold; margin-bottom: 10px;"></p>
+  <div class="modal-content" style="max-width: 450px;">
+    <span class="close-btn" onclick="closeColorModal()" style="cursor:pointer; float: right; font-size: 24px; font-weight: bold;">×</span>
+    <h3 style="margin-top: 0; margin-bottom: 5px; text-align: center;">Select Color</h3>
+    <p id="color-product-name" style="font-weight:bold; color: #555; text-align: center; margin-bottom: 20px;"></p>
 
-    <input type="text" id="color-input" placeholder="Type color name..." autocomplete="off" style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"/>
+    <div style="width: 100%; display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">
+      <div id="large-color-preview" style="width: 100%; height: 160px; border-radius: 8px; border: 2px solid #ddd; background-color: transparent; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); transition: background-color 0.3s ease;"></div>
+      <p id="large-color-name" style="margin-top: 10px; font-size: 1.2em; font-weight: bold; color: #333; min-height: 24px;">No color selected</p>
+    </div>
 
-    <div id="color-suggestions" style="display:flex; gap:10px; flex-wrap: wrap; margin-bottom: 15px;"></div>
+    <input type="text" id="color-input" placeholder="Type a color (e.g. blue, coral, #FF5733)..." autocomplete="off" style="width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1em; outline: none;"/>
 
-    <button class="btn" id="confirm-color-btn" style="background-color: #007bff; color: white; width: 100%; border: none; padding: 10px; border-radius: 5px; cursor: pointer;">Add to Cart</button>
+    <div id="color-suggestions" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 10px; margin-bottom: 20px; max-height: 180px; overflow-y: auto; padding-right: 5px;"></div>
+
+    <button class="btn" id="confirm-color-btn" style="background-color: #007bff; color: white; width: 100%; border: none; padding: 14px; border-radius: 6px; font-size: 1.1em; font-weight: bold; cursor: pointer;">Confirm & Add to Cart</button>
   </div>
 </div>
 
 <script>
+  // --- COUPON LOGIC ---
   window.currentDiscountPct = 0;
 
   function applyCoupon() {
@@ -70,7 +76,6 @@
           return;
       }
 
-      // 1. Verify the coupon with the server
       fetch('/cart/apply-coupon', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -79,7 +84,6 @@
       .then(response => response.json())
       .then(data => {
           if (data.status) {
-              // Success! Save discount
               msgBox.style.color = "green";
               msgBox.innerText = data.message;
               window.currentDiscountPct = data.discount_pct;
@@ -87,16 +91,13 @@
               discountDisplay.style.display = "block";
               discountDisplay.innerText = "Discount Applied: " + data.discount_pct + "% OFF";
 
-              // 2. Fetch the cart to do the exact math and update the UI
               recalculateCartTotalUI();
-
           } else {
-              // Failed / Invalid Code
               msgBox.style.color = "red";
               msgBox.innerText = data.message;
               window.currentDiscountPct = 0;
               discountDisplay.style.display = "none";
-              recalculateCartTotalUI(); // Reset to normal price
+              recalculateCartTotalUI(); 
           }
       })
       .catch(err => {
@@ -106,7 +107,6 @@
       });
   }
 
-  // A helper function to fetch the cart and re-draw the total price
   function recalculateCartTotalUI() {
       fetch('/cart')
       .then(res => res.json())
@@ -116,30 +116,187 @@
               subtotal += (item.price * item.qty);
           });
 
-          // THE FIX: Always trust the backend's memory over the frontend's!
           window.currentDiscountPct = data.discount_pct || 0;
 
           const cartTotalElement = document.getElementById('cart-total');
           const discountDisplay = document.getElementById('discount-display');
 
           if (window.currentDiscountPct > 0) {
-              // Calculate the new discounted price
               let discountAmount = subtotal * (window.currentDiscountPct / 100);
               let newTotal = subtotal - discountAmount;
               
               cartTotalElement.innerHTML = `Total: <span style="text-decoration: line-through; color: #999; font-size: 0.85em;">₦${subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span> <span style="color: #28a745; font-size: 1.2em;">₦${newTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>`;
               
-              // Force the green discount text to show up
               discountDisplay.style.display = "block";
               discountDisplay.innerText = "Discount Applied: " + window.currentDiscountPct + "% OFF";
           } else {
-              // Standard display if no coupon is active
               cartTotalElement.innerHTML = `Total: ₦${subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-              
-              // Hide the green text
               discountDisplay.style.display = "none";
           }
       })
       .catch(err => console.error("Error recalculating cart:", err));
+  }
+
+
+  // --- SMART COLOR SELECTION LOGIC (API POWERED) ---
+
+  let globalColorCatalog = [];
+
+  // Fetch the Global Color API on page load
+  fetch('https://raw.githubusercontent.com/bahamas10/css-color-names/master/css-color-names.json')
+      .then(response => response.json())
+      .then(data => {
+          for (const [colorName, hexCode] of Object.entries(data)) {
+              globalColorCatalog.push({
+                  name: colorName.charAt(0).toUpperCase() + colorName.slice(1), 
+                  hex: hexCode.toUpperCase()
+              });
+          }
+      })
+      .catch(err => console.error("Failed to load Color API:", err));
+
+  let pendingCartItem = {
+      id: null,
+      name: "",
+      qty: 1,
+      unit: "buckets",
+      colorName: "",
+      colorHex: ""
+  };
+
+  const largePreview = document.getElementById('large-color-preview');
+  const largeName = document.getElementById('large-color-name');
+
+  function openColorModal(productId, productName, qty, unit) {
+      pendingCartItem.id = productId;
+      pendingCartItem.name = productName;
+      pendingCartItem.qty = qty || 1;
+      pendingCartItem.unit = unit || "buckets";
+      pendingCartItem.colorName = "";
+      pendingCartItem.colorHex = "";
+
+      document.getElementById('color-product-name').innerText = productName;
+      document.getElementById('color-input').value = "";
+      document.getElementById('color-suggestions').innerHTML = "";
+      
+      // Reset Large Screen
+      largePreview.style.backgroundColor = "transparent";
+      largeName.innerText = "Search to preview a color";
+      
+      document.getElementById('color-modal').style.display = "block"; 
+  }
+
+  function closeColorModal() {
+      document.getElementById('color-modal').style.display = "none";
+  }
+
+  // Live Auto-Complete Engine
+  document.getElementById('color-input').addEventListener('input', function(e) {
+      const query = e.target.value.toLowerCase().trim();
+      const suggestionsBox = document.getElementById('color-suggestions');
+      suggestionsBox.innerHTML = "";
+
+      if (query.length === 0) {
+          largePreview.style.backgroundColor = "transparent";
+          largeName.innerText = "Search to preview a color";
+          return;
+      }
+
+      // 1. Check if it's a valid hex code or generic color
+      const tempDiv = document.createElement("div");
+      tempDiv.style.color = query;
+      if (tempDiv.style.color !== "") {
+          // Send it to the large preview instantly
+          largePreview.style.backgroundColor = query;
+          largeName.innerText = query.toUpperCase();
+          pendingCartItem.colorName = query;
+          pendingCartItem.colorHex = query; 
+      }
+
+      // 2. Search the Global API Data for Dropdown Grid Suggestions
+      const matches = globalColorCatalog.filter(c => c.name.toLowerCase().includes(query)).slice(0, 30); // Show up to 30 squares
+
+      matches.forEach(color => {
+          // Create the Square Swatch
+          const square = document.createElement('div');
+          
+          // Exactly equal length and breadth, crisp 4px rounded corners
+          square.style.cssText = `
+              width: 50%; aspect-ratio: 1/1; 
+              background-color: ${color.hex}; 
+              border: 2px solid #ccc; border-radius: 4px; 
+              cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+              transition: transform 0.1s ease, border-color 0.1s ease;
+          `;
+          
+          // Tooltip shows name when hovered
+          square.title = color.name; 
+
+          square.onmouseover = () => {
+              square.style.transform = "scale(1.1)";
+              square.style.borderColor = "#000";
+          };
+          square.onmouseout = () => {
+              square.style.transform = "scale(1)";
+              square.style.borderColor = "#ccc";
+          };
+
+          // WHEN THEY CLICK THE SQUARE: It sends the color to the Full Size screen!
+          square.onclick = () => {
+              // 1. Update the Cart memory
+              pendingCartItem.colorName = color.name;
+              pendingCartItem.colorHex = color.hex;
+              
+              // 2. Update the Text Input so they know what they selected
+              document.getElementById('color-input').value = color.name;
+              
+              // 3. ENLARGE THE COLOR in the Hero Preview
+              largePreview.style.backgroundColor = color.hex;
+              largeName.innerText = color.name;
+          };
+
+          suggestionsBox.appendChild(square);
+      });
+  });
+
+  // Finally Add to Cart
+  document.getElementById('confirm-color-btn').addEventListener('click', function() {
+      if (!pendingCartItem.colorName) {
+          alert("Please type a valid color or click a square to select one.");
+          return;
+      }
+
+      fetch('/cart/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              product_id: pendingCartItem.id,
+              qty: pendingCartItem.qty,
+              unit: pendingCartItem.unit,
+              color_name: pendingCartItem.colorName,
+              color_hex: pendingCartItem.colorHex
+          })
+      })
+      .then(r => r.json())
+      .then(data => {
+          if(data.status) {
+              closeColorModal();
+              showToast(pendingCartItem.name + " (" + pendingCartItem.colorName + ") added to cart!");
+              
+              if (typeof loadCart === 'function') {
+                  loadCart();
+              } else {
+                  recalculateCartTotalUI();
+              }
+          }
+      })
+      .catch(err => console.error(err));
+  });
+
+  function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.opacity = 1;
+      setTimeout(() => t.style.opacity = 0, 3000);
   }
 </script>

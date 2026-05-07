@@ -1,3 +1,6 @@
+// ==========================================
+// 1. CART LOGIC
+// ==========================================
 async function updateCartCount(){
   const res = await fetch('/cart');
   const data = await res.json();
@@ -15,27 +18,15 @@ function closeCart(){
   document.getElementById('cart-modal').style.display='none'; 
 }
 
-
 async function clearCart(){
-  const res = await fetch('/cart/clear', {
-      method: 'POST'
-  });
+  const res = await fetch('/cart/clear', { method: 'POST' });
   const data = await res.json();
-
-
   document.getElementById('cart-items').innerHTML = '';
   document.getElementById('cart-total').textContent = `Total: ₦0`;
-
-
   updateCartCount();
-
-
   closeCart();
-
-
   showToast("Cart cleared successfully");
 }
-
 
 async function renderCart(){
   const res = await fetch('/cart');
@@ -50,42 +41,37 @@ async function renderCart(){
     li.style.alignItems = 'center';
     li.style.gap = '10px';
 
-
     const text = document.createElement('span');
     text.textContent = `${it.name} x${it.qty} — ₦${(it.price * it.qty).toLocaleString(undefined, {minimumFractionDigits: 2})}`;
     li.appendChild(text);
-if(it.product_type){
-  const type = document.createElement('div');
-  type.style.fontSize = '12px';
-  type.style.opacity = '0.7';
-  type.textContent = `Type: ${it.product_type}`;
-  li.appendChild(type);
-}
 
+    if(it.product_type){
+      const type = document.createElement('div');
+      type.style.fontSize = '12px';
+      type.style.opacity = '0.7';
+      type.textContent = `Type: ${it.product_type}`;
+      li.appendChild(type);
+    }
 
-const colorWrapper = document.createElement('div');
-colorWrapper.style.display = 'flex';
-colorWrapper.style.alignItems = 'center';
-colorWrapper.style.gap = '6px';
+    const colorWrapper = document.createElement('div');
+    colorWrapper.style.display = 'flex';
+    colorWrapper.style.alignItems = 'center';
+    colorWrapper.style.gap = '6px';
 
-if(it.color_hex){
-  const swatch = document.createElement('div');
-  swatch.style.width = '16px';
-  swatch.style.height = '16px';
-  swatch.style.borderRadius = '4px';
-  swatch.style.backgroundColor = it.color_hex;
-  swatch.style.border = '1px solid #000';
-  colorWrapper.appendChild(swatch);
-}
+    if(it.color_hex){
+      const swatch = document.createElement('div');
+      swatch.style.width = '16px';
+      swatch.style.height = '16px';
+      swatch.style.borderRadius = '4px';
+      swatch.style.backgroundColor = it.color_hex;
+      swatch.style.border = '1px solid #000';
+      colorWrapper.appendChild(swatch);
+    }
 
-const cname = document.createElement('span');
-cname.textContent = it.color_name ? it.color_name : "No color selected";
-colorWrapper.appendChild(cname);
-
-li.appendChild(colorWrapper);
-
-
-
+    const cname = document.createElement('span');
+    cname.textContent = it.color_name ? it.color_name : "No color selected";
+    colorWrapper.appendChild(cname);
+    li.appendChild(colorWrapper);
 
     const del = document.createElement('button');
     del.textContent = 'Delete';
@@ -109,7 +95,6 @@ li.appendChild(colorWrapper);
 }
 
 async function addToCart(pid, qty=1, color=null, unit=null){
-
   const payload = {
     product_id: pid,
     qty: qty,
@@ -131,7 +116,6 @@ async function addToCart(pid, qty=1, color=null, unit=null){
   }
 }
 
-
 function confirmQuantity(){
   const qty  = parseFloat(document.getElementById("qty-input").value);
   const unit = document.getElementById("unit-input").value;
@@ -143,279 +127,245 @@ function confirmQuantity(){
 
   window.selectedQty = qty;
   window.selectedUnit = unit;
-  openColorModal(qtyProductId, "Select Color");
+  openColorModal(window.qtyProductId || null, "Select Color");
 
-  closeQtyModal();
+  if(typeof closeQtyModal === 'function') closeQtyModal();
 }
-
 
 function showToast(message) {
   const toast = document.getElementById('toast');
+  if(!toast) return;
   toast.textContent = message;
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 4000);
 }
-
-let selectedProductId = null;
-let selectedColor = null;
-let colorBank = [];
-
-
-
-async function loadColors() {
-    if (colorBank.length) return;
-
-    for (let i = 0; i < 8; i++) {
-        try {
-            const res = await fetch(
-              `https://www.thecolorapi.com/scheme?count=100&mode=analogic&hex=${Math.floor(Math.random()*16777215).toString(16)}`
-            );
-            const data = await res.json();
-
-            data.colors.forEach(c => {
-                colorBank.push({
-                    name: c.name.value,
-                    hex: c.hex.value,
-                    img: c.image.bare
-                });
-            });
-        } catch {}
-    }
-}
-
-
-function openColorPicker(productId) {
-    selectedProductId = productId;
-    document.getElementById("color-modal").style.display = "block";
-    loadColors();
-}
-
-
-function searchColors() {
-    const query = document.getElementById("colorSearch").value.toLowerCase();
-    const results = document.getElementById("colorResults");
-    results.innerHTML = "";
-
-    if (!query) return;
-
-    colorBank
-      .filter(c => c.name.toLowerCase().includes(query))
-      .slice(0, 30)
-      .forEach(color => {
-          const div = document.createElement("div");
-          div.className = "color-item";
-          div.innerHTML = `
-              <img src="${color.img}">
-              <span>${color.name}</span>
-          `;
-          div.onclick = () => selectColor(color);
-          results.appendChild(div);
-      });
-}
-
-
-function selectColor(color){
-    if(!selectedProductId) return;
-    addToCart(selectedProductId, 1, color);
-    closeColorModal();
-}
-
-
-
-function closeColorModal() {
-    document.getElementById("color-modal").style.display = "none";
-    document.getElementById("colorSearch").value = "";
-    document.getElementById("colorResults").innerHTML = "";
-}
-
-
-
-
-window.openColorModal = function(productId, productName){
-  if(event) event.preventDefault();
-  selectedProductId = productId;
-  selectedColor = null;
-  document.getElementById('color-modal-title').textContent = productName;
-  document.getElementById('color-input').value = '';
-  document.getElementById('color-suggestions').innerHTML = '';
-  document.getElementById('color-modal').style.display = 'block';
-}
-
-window.closeColorModal = function(){
-  document.getElementById('color-modal').style.display = 'none';
-  selectedProductId = null;
-  selectedColor = null;
-}
-
-document.getElementById('color-input').addEventListener('input', async function(){
-  const raw = this.value.trim();
-  const suggestionsDiv = document.getElementById('color-suggestions');
-  suggestionsDiv.innerHTML = '';
-  selectedColor = null;
-
-  if(!raw) return;
-
-  const candidates = [raw, raw.replace(/\s+/g, '')];
-
-  function browserColorValid(nameOrHex){
-    const test = document.createElement('div');
-    test.style.backgroundColor = '';
-    test.style.backgroundColor = nameOrHex;
-    return !!test.style.backgroundColor;
-  }
-
-  let mainColor=null, mainName=null, mainHex=null;
-
-  for(const c of candidates){
-    if(browserColorValid(c)){
-      mainColor = c; mainName=c;
-      const div = document.createElement('div');
-      div.style.backgroundColor = c;
-      const cs = getComputedStyle(div).backgroundColor;
-      const m = cs.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-      if(m){
-        const toHex = n=>('0'+n.toString(16)).slice(-2);
-        mainHex = `#${toHex(parseInt(m[1],10))}${toHex(parseInt(m[2],10))}${toHex(parseInt(m[3],10))}`.toUpperCase();
-      }
-      break;
-    }
-  }
-
-
-  if(!mainColor){
-    try{
-      const res = await fetch(`https://www.thecolorapi.com/scheme?hex=${encodeURIComponent(raw.replace('#',''))}&mode=monochrome&count=1`);
-      if(res.ok){
-        const data = await res.json();
-        if(data?.colors?.length){
-          mainHex = data.colors[0].hex?.value || '#CCCCCC';
-          mainName = data.colors[0].name?.value || raw;
-          mainColor = browserColorValid(mainName) ? mainName : mainHex;
-        }
-      }
-    }catch{}
-  }
-
-
-  if(!mainColor){
-    mainColor = '#CCCCCC';
-    mainHex = '#CCCCCC';
-    mainName = raw;
-  }
-
-
-  const wrapper = document.createElement('div');
-  wrapper.style.display = 'inline-block';
-  wrapper.style.margin='4px';
-  wrapper.style.textAlign='center';
-  wrapper.style.fontSize='12px';
-
-  const sw = document.createElement('div');
-  sw.style.width='40px';
-  sw.style.height='40px';
-  sw.style.borderRadius='6px';
-  sw.style.border='2px solid #ccc';
-  sw.style.cursor='pointer';
-  sw.style.backgroundColor=mainColor;
-  sw.title=`${mainName} — ${mainHex}`;
-  sw.addEventListener('click', ()=>{
-    document.querySelectorAll('#color-suggestions div > div').forEach(d=>d.style.border='2px solid #ccc');
-    sw.style.border='2px solid black';
-    selectedColor={name:mainName, hex:mainHex};
-  });
-
-  const lbl = document.createElement('div');
-  lbl.style.whiteSpace='pre';
-  lbl.textContent=`${mainName}\n${mainHex}`;
-
-  wrapper.appendChild(sw);
-  wrapper.appendChild(lbl);
-  suggestionsDiv.appendChild(wrapper);
-
-
-  try{
-    const schemeRes = await fetch(`https://www.thecolorapi.com/scheme?hex=${mainHex.replace('#','')}&mode=analogic&count=5`);
-    if(schemeRes.ok){
-      const schemeData = await schemeRes.json();
-      schemeData.colors?.forEach(c=>{
-        const chex=c.hex?.value;
-        const cname=c.name?.value||chex;
-        if(!chex) return;
-
-        const wrap = document.createElement('div');
-        wrap.style.display='inline-block';
-        wrap.style.textAlign='center';
-        wrap.style.fontSize='11px';
-        wrap.style.marginRight='6px';
-
-        const sw2 = document.createElement('div');
-        sw2.style.width='36px';
-        sw2.style.height='36px';
-        sw2.style.borderRadius='6px';
-        sw2.style.border='2px solid #ccc';
-        sw2.style.cursor='pointer';
-        sw2.style.backgroundColor=browserColorValid(cname)?cname:chex;
-        sw2.title=`${cname} — ${chex}`;
-        sw2.addEventListener('click', ()=>{
-          document.querySelectorAll('#color-suggestions div > div').forEach(d=>d.style.border='2px solid #ccc');
-          sw2.style.border='2px solid black';
-          selectedColor={name:cname, hex:chex};
-        });
-
-        const lbl2 = document.createElement('div');
-        lbl2.style.whiteSpace='pre';
-        lbl2.textContent=`${cname}\n${chex}`;
-
-        wrap.appendChild(sw2);
-        wrap.appendChild(lbl2);
-        suggestionsDiv.appendChild(wrap);
-      });
-    }
-  }catch{}
-});
-
-
-document.getElementById('confirm-color-btn').addEventListener('click', async () => {
-  if (!selectedProductId || !selectedColor) {
-    alert('Please select a color.');
-    return;
-  }
-
-  try {
-
-    await addToCart(
-    selectedProductId,
-    window.selectedQty,
-    selectedColor,
-    window.selectedUnit
-);
-
-
-    closeColorModal();
-
-    if (typeof showToast === 'function') showToast('Added to cart with selected color');
-  } catch (err) {
-    console.error(err);
-    alert('Error adding product to cart.');
-  }
-});
-
-
 
 function proceedToCheckout(){
   window.location.href='/checkout';
 }
 
 
+// ==========================================
+// 2. NEW SMART COLOR SELECTION LOGIC (API POWERED)
+// ==========================================
+let globalColorCatalog = [];
+
+// Fetch the Global Color API instantly in the background
+fetch('https://raw.githubusercontent.com/bahamas10/css-color-names/master/css-color-names.json')
+    .then(response => response.json())
+    .then(data => {
+        for (const [colorName, hexCode] of Object.entries(data)) {
+            globalColorCatalog.push({
+                name: colorName.charAt(0).toUpperCase() + colorName.slice(1), 
+                hex: hexCode.toUpperCase()
+            });
+        }
+        console.log("Global Color API Loaded:", globalColorCatalog.length, "colors ready.");
+    })
+    .catch(err => console.error("Failed to load Color API:", err));
+
+let pendingCartItem = {
+    id: null,
+    name: "",
+    qty: 1,
+    unit: "buckets",
+    colorName: "",
+    colorHex: ""
+};
+
+window.openColorModal = function(productId, productName) {
+    if(event) event.preventDefault();
+    
+    pendingCartItem.id = productId;
+    pendingCartItem.name = productName;
+    pendingCartItem.qty = window.selectedQty || 1;
+    pendingCartItem.unit = window.selectedUnit || "buckets";
+    pendingCartItem.colorName = "";
+    pendingCartItem.colorHex = "";
+
+    const nameEl = document.getElementById('color-product-name');
+    if(nameEl) nameEl.innerText = productName;
+    
+    const inputEl = document.getElementById('color-input');
+    if(inputEl) inputEl.value = "";
+    
+    const suggestionsBox = document.getElementById('color-suggestions');
+    if(suggestionsBox) suggestionsBox.innerHTML = "";
+    
+    // Reset the Preview Screen Safely
+    const largePreview = document.getElementById('live-color-preview');
+    const largeName = document.getElementById('live-color-name');
+    if (largePreview) {
+        largePreview.style.backgroundColor = "transparent";
+        largePreview.style.borderColor = "#eaeaea";
+    }
+    if (largeName) {
+        largeName.innerText = "Search to preview a color";
+    }
+
+    const modal = document.getElementById('color-modal');
+    if(modal) modal.style.display = "block"; 
+};
+
+window.closeColorModal = function() {
+    const modal = document.getElementById('color-modal');
+    if(modal) modal.style.display = "none";
+};
+
+// Live Engine for Typing & Rendering
+const colorInputEl = document.getElementById('color-input');
+if (colorInputEl) {
+    colorInputEl.addEventListener('input', function(e) {
+        const query = e.target.value.toLowerCase().trim();
+        const suggestionsBox = document.getElementById('color-suggestions');
+        const largePreview = document.getElementById('live-color-preview');
+        const largeName = document.getElementById('live-color-name'); // Might be missing in HTML, handled safely now
+        
+        suggestionsBox.innerHTML = "";
+
+        if (query.length === 0) {
+            if(largePreview) {
+                largePreview.style.backgroundColor = "transparent";
+                largePreview.style.borderColor = "#eaeaea";
+            }
+            if(largeName) largeName.innerText = "Search to preview a color";
+            return;
+        }
+
+        // 1. Is it a valid global color code?
+        const tempDiv = document.createElement("div");
+        tempDiv.style.color = query;
+        if (tempDiv.style.color !== "") {
+            if(largePreview) {
+                largePreview.style.backgroundColor = query;
+                largePreview.style.borderColor = "#333";
+            }
+            if(largeName) largeName.innerText = query.toUpperCase();
+            
+            pendingCartItem.colorName = query;
+            pendingCartItem.colorHex = query; 
+        } else {
+            if(largePreview) {
+                largePreview.style.backgroundColor = "transparent";
+                largePreview.style.borderColor = "#eaeaea";
+            }
+            if(largeName) largeName.innerText = "Searching...";
+        }
+
+        // 2. Build the Grid of Square + Name Combos with Hardcoded Inline CSS (Bulletproof)
+        const matches = globalColorCatalog.filter(c => c.name.toLowerCase().includes(query)).slice(0, 30);
+
+        // Ensure the grid layout is applied to the suggestions box
+        suggestionsBox.style.display = "grid";
+        suggestionsBox.style.gridTemplateColumns = "repeat(auto-fill, minmax(80px, 1fr))";
+        suggestionsBox.style.gap = "15px";
+
+        matches.forEach(color => {
+            const wrapper = document.createElement('div');
+            wrapper.style.display = "flex";
+            wrapper.style.flexDirection = "column";
+            wrapper.style.alignItems = "center";
+            wrapper.style.gap = "6px";
+            wrapper.style.cursor = "pointer";
+            wrapper.style.transition = "transform 0.15s ease";
+            
+            const square = document.createElement('div');
+            square.style.width = "100%";
+            square.style.aspectRatio = "1/1";
+            square.style.backgroundColor = color.hex;
+            square.style.border = "3px solid #bbb";
+            square.style.borderRadius = "12px";
+            square.style.boxShadow = "0 4px 8px rgba(0,0,0,0.15)";
+            square.style.transition = "border-color 0.15s ease, box-shadow 0.15s ease";
+            
+            const label = document.createElement('span');
+            label.style.fontSize = "0.75em";
+            label.style.fontWeight = "bold";
+            label.style.textAlign = "center";
+            label.style.color = "#333";
+            label.innerText = color.name;
+
+            wrapper.appendChild(square);
+            wrapper.appendChild(label);
+
+            // Hover effects
+            wrapper.onmouseover = () => {
+                wrapper.style.transform = "scale(1.1)";
+                square.style.borderColor = "#000";
+                square.style.boxShadow = "0 8px 16px rgba(0,0,0,0.3)";
+            };
+            wrapper.onmouseout = () => {
+                wrapper.style.transform = "scale(1)";
+                square.style.borderColor = "#bbb";
+                square.style.boxShadow = "0 4px 8px rgba(0,0,0,0.15)";
+            };
+
+            // When clicked, send to preview screen
+            wrapper.onclick = () => {
+                if(largePreview) {
+                    largePreview.style.backgroundColor = color.hex;
+                    largePreview.style.borderColor = "#333";
+                }
+                if(largeName) {
+                    largeName.innerText = color.name;
+                }
+                
+                document.getElementById('color-input').value = color.name;
+                pendingCartItem.colorName = color.name;
+                pendingCartItem.colorHex = color.hex;
+                
+                suggestionsBox.innerHTML = ""; 
+            };
+
+            suggestionsBox.appendChild(wrapper);
+        });
+    });
+}
+
+// Confirm Button Add to Cart
+const confirmColorBtn = document.getElementById('confirm-color-btn');
+if (confirmColorBtn) {
+    confirmColorBtn.addEventListener('click', async () => {
+        if (!pendingCartItem.colorName) {
+            alert("Please search for a valid color or click a square to select one.");
+            return;
+        }
+
+        try {
+            await addToCart(
+                pendingCartItem.id,
+                pendingCartItem.qty,
+                { name: pendingCartItem.colorName, hex: pendingCartItem.colorHex },
+                pendingCartItem.unit
+            );
+
+            closeColorModal();
+            
+            if (typeof renderCart === 'function') renderCart();
+            if (typeof recalculateCartTotalUI === 'function') recalculateCartTotalUI();
+            
+        } catch (err) {
+            console.error(err);
+            alert('Error adding product to cart.');
+        }
+    });
+}
 
 
+// ==========================================
+// 3. RATING SYSTEM & FAQS
+// ==========================================
 document.addEventListener('DOMContentLoaded', function(){
   const starWidget = document.getElementById('star-widget');
+  
   if(starWidget){
     const stars = Array.from(starWidget.querySelectorAll('.star'));
     let selected = 0;
-    const pid = starWidget.dataset.pid;
+    
+    // Safely grab the product ID from the HTML data attribute
+    const pid = starWidget.dataset.pid || (typeof PRODUCT_ID !== 'undefined' ? PRODUCT_ID : null);
 
+    // Function to visually fill the stars
     function setStars(val){
       stars.forEach(s => { 
         if(parseInt(s.dataset.value) <= val){
@@ -428,74 +378,161 @@ document.addEventListener('DOMContentLoaded', function(){
       });
     }
 
-    stars.forEach(s=>{
-      s.addEventListener('mouseover', ()=> setStars(parseInt(s.dataset.value)));
-      s.addEventListener('mouseout', ()=> setStars(selected));
-      s.addEventListener('click', ()=> { 
+    // Add hover and click effects to the stars
+    stars.forEach(s => {
+      s.addEventListener('mouseover', () => setStars(parseInt(s.dataset.value)));
+      s.addEventListener('mouseout', () => setStars(selected));
+      s.addEventListener('click', () => { 
         selected = parseInt(s.dataset.value); 
         setStars(selected); 
       });
     });
 
-    document.getElementById('submit-rating').addEventListener('click', async ()=>{
-      const starsVal = selected;
-      const comment = document.getElementById('rating-comment').value;
-      const orderRef = document.getElementById('order-ref').value || null;
+    // Handle the actual submission
+    const submitBtn = document.getElementById('submit-rating');
+    if(submitBtn) {
+        submitBtn.addEventListener('click', async () => {
+          const starsVal = selected;
+          
+          // SAFELY grab the inputs to prevent silent JavaScript crashes
+          const commentEl = document.getElementById('rating-comment');
+          const comment = commentEl ? commentEl.value.trim() : "";
+          
+          const orderRefEl = document.getElementById('order-ref');
+          const orderRef = orderRefEl ? orderRefEl.value.trim() : null;
 
-      if(!starsVal){ alert('Select stars'); return; }
+          if(!starsVal){ 
+              alert('Please select a star rating first.'); 
+              return; 
+          }
 
-      const resp = await fetch('/rate', {
-          method:'POST', 
-          headers:{'Content-Type':'application/json'}, 
-          body: JSON.stringify({product_id: pid, stars: starsVal, comment, order_ref: orderRef})
-      });
+          if(!pid) {
+              alert('Error: Product ID is missing from the page.');
+              return;
+          }
 
-      const data = await resp.json();
-      if(data.status){
-        document.getElementById('rating-feedback').textContent = 'Thanks for rating!';
-        renderRatings(data.summary);
-      } else {
-        document.getElementById('rating-feedback').textContent = data.message || 'Error';
-      }
-    });
+          // UI feedback while sending to server
+          const feedbackEl = document.getElementById('rating-feedback');
+          if(feedbackEl) {
+              feedbackEl.style.color = "#007bff"; // Blue for loading
+              feedbackEl.textContent = 'Submitting your rating...';
+          }
+          submitBtn.disabled = true;
 
-    fetch(`/ratings-summary?product_id=${PRODUCT_ID || pid}`)
-      .then(r=>r.json())
-      .then(d=>{
-        if(d.status) renderRatings(d.summary);
-      });
+          try {
+              const resp = await fetch('/rate', {
+                  method: 'POST', 
+                  headers: {'Content-Type': 'application/json'}, 
+                  // Send null for order_ref if the box is empty, so the backend doesn't crash
+                  body: JSON.stringify({
+                      product_id: pid, 
+                      stars: starsVal, 
+                      comment: comment, 
+                      order_ref: orderRef || null 
+                  })
+              });
 
-    function renderRatings(summary){
-    if(!summary) return;
-
-    document.getElementById('avg-rating').textContent = summary.average.toFixed(2);
-    document.getElementById('total-ratings').textContent = summary.total;
-    const avg = Math.round(summary.average);
-    setStars(avg);
-    selected = avg;
-    const ctx = document.getElementById('ratingsPie').getContext('2d');
-    if(window._ratingsChart) { 
-        window._ratingsChart.data.datasets[0].data = summary.values; 
-        window._ratingsChart.update(); 
-        return; 
+              const data = await resp.json();
+              
+              if(data.status){
+                // Success!
+                if(feedbackEl) {
+                    feedbackEl.style.color = "green";
+                    feedbackEl.textContent = 'Thanks for your rating!';
+                }
+                
+                // Clear the input boxes so they don't submit twice
+                if(commentEl) commentEl.value = ""; 
+                if(orderRefEl) orderRefEl.value = ""; 
+                
+                // Update the visual charts with the new math
+                renderRatings(data.summary);
+              } else {
+                // Failed (Likely because order wasn't delivered yet)
+                if(feedbackEl) {
+                    feedbackEl.style.color = "red";
+                    feedbackEl.textContent = data.message || 'Error saving rating.';
+                }
+                alert(data.message || 'Error saving rating. Ensure your order reference is valid and marked as delivered.');
+              }
+          } catch(err) {
+              console.error("Rating submission error:", err);
+              if(feedbackEl) {
+                  feedbackEl.style.color = "red";
+                  feedbackEl.textContent = "Failed to connect to the server.";
+              }
+          } finally {
+              // Re-enable the button
+              submitBtn.disabled = false;
+          }
+        });
     }
 
-    window._ratingsChart = new Chart(ctx, {
-        type: 'pie',
-        data: { labels: summary.labels, datasets: [{ data: summary.values, backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'] }] },
-        options: { responsive:true }
-    });
-}
+    // Fetch initial ratings summary when the page loads
+    if(pid) {
+        fetch(`/ratings-summary?product_id=${pid}`)
+          .then(r => r.json())
+          .then(d => {
+            if(d.status) renderRatings(d.summary);
+          })
+          .catch(err => console.error("Error fetching ratings summary:", err));
+    }
+
+    // Safely update the DOM and Chart.js with the new math
+    function renderRatings(summary){
+        if(!summary) return;
+        
+        const avgRatingEl = document.getElementById('avg-rating');
+        if(avgRatingEl) avgRatingEl.textContent = summary.average.toFixed(2);
+        
+        const totalRatingsEl = document.getElementById('total-ratings');
+        if(totalRatingsEl) totalRatingsEl.textContent = summary.total;
+        
+        const avg = Math.round(summary.average);
+        setStars(avg);
+        selected = avg; // Lock the stars visually to the average
+        
+        const canvasEl = document.getElementById('ratingsPie');
+        if (canvasEl) {
+            const ctx = canvasEl.getContext('2d');
+            if(window._ratingsChart) { 
+                // Update existing chart
+                window._ratingsChart.data.datasets[0].data = summary.values; 
+                window._ratingsChart.update(); 
+                return; 
+            }
+
+            // Create new chart (Make sure Chart.js is imported in your HTML)
+            if(typeof Chart !== 'undefined') {
+                window._ratingsChart = new Chart(ctx, {
+                    type: 'pie',
+                    data: { 
+                        labels: summary.labels, 
+                        datasets: [{ 
+                            data: summary.values, 
+                            backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'] 
+                        }] 
+                    },
+                    options: { responsive:true }
+                });
+            }
+        }
+    }
   }
 
+  // FAQs Toggle Logic
   document.querySelectorAll('.faq-question').forEach(q => {
-    q.addEventListener('click', ()=> q.nextElementSibling.classList.toggle('open'));
+    q.addEventListener('click', ()=> {
+        q.nextElementSibling.classList.toggle('open');
+    });
   });
 });
 
 
+// ==========================================
+// 4. SMOOTH SCROLLING
+// ==========================================
 (function () {
-
   if (window.matchMedia("(max-width: 768px)").matches) {
     return;
   }
@@ -533,7 +570,9 @@ document.addEventListener('DOMContentLoaded', function(){
 })();
 
 
-
+// ==========================================
+// 5. CAMERA & FACE CAPTURE LOGIC
+// ==========================================
 let stream = null;
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
@@ -542,17 +581,16 @@ const facePreview = document.getElementById('facePreview');
 const faceError = document.getElementById('faceError');
 const startCameraBtn = document.getElementById('startCamera');
 
-
-
-startCameraBtn.onclick = async () => {
-  if (!stream) {
-    stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = stream;
-    video.style.display = 'block';
-    video.play();
-  }
-};
-
+if (startCameraBtn) {
+    startCameraBtn.onclick = async () => {
+      if (!stream) {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        video.style.display = 'block';
+        video.play();
+      }
+    };
+}
 
 function capture() {
   if (!stream) return;
@@ -587,8 +625,6 @@ function capture() {
   stopCamera();
 }
 
-
-
 function isLikelyFace(ctx, size) {
   const imageData = ctx.getImageData(0, 0, size, size).data;
   let brightPixels = 0;
@@ -597,11 +633,8 @@ function isLikelyFace(ctx, size) {
     const brightness = (imageData[i] + imageData[i+1] + imageData[i+2]) / 3;
     if (brightness > 60) brightPixels++;
   }
-
   return brightPixels > (size * size * 0.25);
 }
-
-
 
 function stopCamera() {
   if (stream) {
@@ -610,8 +643,6 @@ function stopCamera() {
     video.style.display = 'none';
   }
 }
-
-
 
 function validateFaceAndProceed() {
   if (!imageInput.value) {
@@ -631,14 +662,18 @@ function prevPhase(current) {
   document.getElementById(`phase${current - 1}`).style.display = 'block';
 }
 
+if (facePreview) {
+    facePreview.onclick = () => {
+      const win = window.open();
+      win.document.write(`<img src="${facePreview.src}" style="width:100%">`);
+    };
+}
 
-facePreview.onclick = () => {
-  const win = window.open();
-  win.document.write(`<img src="${facePreview.src}" style="width:100%">`);
-};
 
-
-const data = {
+// ==========================================
+// 6. LOCATION DATA DROPDOWNS
+// ==========================================
+const locationData = {
   Nigeria: {
     "Abia": ["Aba North","Aba South","Arochukwu","Bende","Ikwuano","Isiala Ngwa North","Isiala Ngwa South","Isuikwuato","Obi Ngwa","Ohafia","Osisioma","Ugwunagbo","Ukwa East","Ukwa West","Umuahia North","Umuahia South","Umu Nneochi"],
   "Adamawa": ["Demsa","Fufore","Ganaye","Ganye","Girei","Gombi","Guyuk","Hong","Jada","Lamurde","Madagali","Maiha","Mayo Belwa","Michika","Mubi North","Mubi South","Numan","Shelleng","Song","Toungo","Yola North","Yola South"],
@@ -677,69 +712,67 @@ const data = {
   "Yobe": ["Bade","Bursari","Damaturu","Fika","Fune","Gashua","Gujba","Gulani","Jakusko","Karasuwa","Machina","Nangere","Nguru","Potiskum","Tarmuwa","Yunusari","Yusufari"],
   "Zamfara": ["Anka","Bakura","Birnin Magaji","Bukkuyum","Chafe","Gummi","Gusau","Kaura Namoda","Maradun","Shinkafi","Talata Mafara","Tsafe","Zurmi"],
   },
-
   Ghana: {
     "Greater Accra": ["Accra Metropolitan","Tema Metropolitan"],
     "Ashanti": ["Kumasi Metropolitan"]
   },
-
-  Cameroon: {
+  Cameroine: {
     "Littoral": ["Wouri"],
     "Centre": ["Mfoundi"]
   },
-
   Niger: {
     "Niamey": ["Niamey I","Niamey II","Niamey III"]
   },
-
   Benin: {
     "Littoral": ["Cotonou"],
     "Atlantique": ["Abomey-Calavi"]
   },
-
   Chad: {
     "N'Djamena": ["N'Djamena"]
   }
 };
 
-
 const countrySelect = document.getElementById("country");
 const stateSelect = document.getElementById("state");
 const lgaSelect = document.getElementById("lga");
 
-countrySelect.addEventListener("change", () => {
-  stateSelect.innerHTML = '<option value="">Select State</option>';
-  lgaSelect.innerHTML = '<option value="">Select L.G.A</option>';
+if (countrySelect && stateSelect && lgaSelect) {
+    countrySelect.addEventListener("change", () => {
+      stateSelect.innerHTML = '<option value="">Select State</option>';
+      lgaSelect.innerHTML = '<option value="">Select L.G.A</option>';
 
-  const states = data[countrySelect.value];
-  if (states) {
-    Object.keys(states).forEach(state => {
-      const option = document.createElement("option");
-      option.value = state;
-      option.textContent = state;
-      stateSelect.appendChild(option);
+      const states = locationData[countrySelect.value];
+      if (states) {
+        Object.keys(states).forEach(state => {
+          const option = document.createElement("option");
+          option.value = state;
+          option.textContent = state;
+          stateSelect.appendChild(option);
+        });
+      }
     });
-  }
-});
 
-stateSelect.addEventListener("change", () => {
-  lgaSelect.innerHTML = '<option value="">Select L.G.A</option>';
+    stateSelect.addEventListener("change", () => {
+      lgaSelect.innerHTML = '<option value="">Select L.G.A</option>';
 
-  const lgas = data[countrySelect.value]?.[stateSelect.value];
-  if (lgas) {
-    lgas.forEach(lga => {
-      const option = document.createElement("option");
-      option.value = lga;
-      option.textContent = lga;
-      lgaSelect.appendChild(option);
+      const lgas = locationData[countrySelect.value]?.[stateSelect.value];
+      if (lgas) {
+        lgas.forEach(lga => {
+          const option = document.createElement("option");
+          option.value = lga;
+          option.textContent = lga;
+          lgaSelect.appendChild(option);
+        });
+      }
     });
-  }
-});
+}
 
-
+// ==========================================
+// 7. PICKUP VERIFICATION
+// ==========================================
 async function verifyPickup(code, btn) {
     try {
-        const res = await fetch('/verify-pickup', {
+        const res = await fetch('/admin/verify-pickup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pickup_code: code })
@@ -749,7 +782,10 @@ async function verifyPickup(code, btn) {
 
         if (data.success) {
             const row = btn.closest('tr');
-            row.querySelector('.delivered-status').textContent = 'Yes';
+            if (row) {
+               const statusCell = row.querySelector('.delivered-status');
+               if (statusCell) statusCell.textContent = 'Yes';
+            }
             btn.disabled = true;
             btn.textContent = 'Verified';
         }
